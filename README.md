@@ -1,38 +1,85 @@
-# Primos_CheckIn
+# Primos Daily Check-in App
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+A Next.js application that interacts with a daily check-in contract deployed on the Ronin Saigon testnet.
+
+## Features
+
+- Connect to Ronin wallet
+- View last check-in time
+- Perform daily check-ins
+- Track check-in count
+- Check contract owner and user status
+
+## Prerequisites
+
+- Node.js and npm installed
+- Ronin wallet browser extension installed
+- Access to Ronin Saigon testnet
 
 ## Getting Started
 
-First, run the development server:
+1. Clone the repository
+2. Install dependencies:
+
+```bash
+npm install
+```
+
+3. Deploy the contract to Ronin Saigon testnet (see below)
+4. Update the contract address in `src/utils/contract.ts`
+5. Start the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+6. Open [http://localhost:3000](http://localhost:3000) in your browser
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Deploying the Contract
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The contract bytecode is provided in `src/utils/contract.ts`. You can deploy it to the Ronin Saigon testnet using:
 
-## Learn More
+1. Ronin wallet browser extension
+2. Remix IDE connected to Ronin network
+3. Hardhat or Truffle with Ronin network configuration
 
-To learn more about Next.js, take a look at the following resources:
+After deploying the contract, update the `CONTRACT_ADDRESS` in `src/utils/contract.ts` with your deployed contract address.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Contract Functions
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The contract provides the following functions:
 
-## Deploy on Vercel
+- `owner()`: Returns the contract owner address
+- `transferOwnership(address newOwner)`: Transfers ownership to a new address
+- `renounceOwnership()`: Renounces ownership
+- `checkIn(address account)`: Records a daily check-in for an account
+- `getLastCheckIn(address account)`: Returns the timestamp of the last check-in
+- `hasCheckedIn(address account)`: Checks if an account has already checked in today
+- `getCheckInCount(address account)`: Returns the total number of check-ins for an account
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Ronin Saigon Testnet
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Ronin Saigon is the testnet for the Ronin blockchain. To use it:
+
+1. Add Saigon testnet to your Ronin wallet:
+   - Network Name: Ronin Saigon Testnet
+   - RPC URL: https://saigon-testnet.roninchain.com/rpc
+   - Chain ID: 2021
+   - Symbol: RON
+   - Block Explorer URL: https://saigon-explorer.roninchain.com
+
+2. Get testnet RON from the faucet (if available)
+
+## Technologies Used
+
+- Next.js
+- TypeScript
+- Tailwind CSS
+- ethers.js
+- Ronin wallet integration
+
+## Troubleshooting
+
+- Make sure your Ronin wallet is connected to the Saigon testnet
+- Ensure you have sufficient testnet RON for gas fees
+- Check the console for any errors during contract interactions
