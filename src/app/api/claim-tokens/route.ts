@@ -1,7 +1,6 @@
 import { ethers } from 'ethers';
 import { NextResponse } from 'next/server';
 import { supabase } from '@/utils/supabase';
-import { createRoninProviderWithFallback } from '@/utils/rpc-provider';
 import { createDirectWallet, getBlockNumberDirect, callRpcDirectly } from '@/utils/direct-rpc';
 import { logDetailedError } from '@/utils/retry-utils';
 
@@ -146,8 +145,6 @@ export async function POST(request: Request) {
         { url: process.env.RONIN_RPC_URL || '', apiKey: process.env.MORALIS_API_KEY, name: 'Moralis primario' },
         // Moralis secundario (segunda opción)
         { url: process.env.RONIN_RPC_URL_BACKUP || '', apiKey: process.env.MORALIS_API_KEY, name: 'Moralis secundario' },
-        // Tenderly (tercera opción)
-        { url: process.env.TENDERLY_RPC_URL || '', apiKey: undefined, name: 'Tenderly' },
         // Público como último recurso
         { url: 'https://api.roninchain.com/rpc', apiKey: undefined, name: 'RPC público' }
       ].filter(e => !!e.url); // Filtrar endpoints sin URL

@@ -10,7 +10,6 @@ const RONIN_NETWORK = {
 // URLs de Moralis para Ronin
 const PRIMARY_RPC_URL = process.env.RONIN_RPC_URL || 'https://api.roninchain.com/rpc';
 const BACKUP_RPC_URL = process.env.RONIN_RPC_URL_BACKUP;
-const TENDERLY_RPC_URL = process.env.TENDERLY_RPC_URL;
 const MORALIS_API_KEY = process.env.MORALIS_API_KEY;
 
 // Tiempo de espera ampliado para permitir conexiones más lentas
@@ -92,35 +91,6 @@ export const createRoninProviderWithFallback = async (): Promise<ethers.provider
       }
     }
     
-    // Intentar con Tenderly como respaldo adicional
-    if (TENDERLY_RPC_URL) {
-      try {
-        console.log('🔄 Intentando conexión via Tenderly...');
-        
-        // La URL de Tenderly ya incluye la API key en la ruta
-        const tenderlyProvider = new ethers.providers.JsonRpcProvider(
-          {
-            url: TENDERLY_RPC_URL,
-            // Aplicar la configuración de no-referrer también para Tenderly
-            headers: {
-              ...fetchOptions.headers
-            },
-            fetchOptions: {
-              referrerPolicy: 'no-referrer'
-            }
-          },
-          RONIN_NETWORK
-        );
-        
-        // Verificar que funciona
-        const blockNumber = await tenderlyProvider.getBlockNumber();
-        console.log(`✅ Conexión exitosa a Tenderly. Bloque actual: ${blockNumber}`);
-        
-        return tenderlyProvider;
-      } catch (tenderlyError) {
-        console.error('❌ Conexión a Tenderly falló:', tenderlyError);
-      }
-    }
     
     // Último recurso - RPC público
     try {
