@@ -45,7 +45,7 @@ const nextConfig = {
   experimental: {
     // Usar estas opciones sólo si son necesarias para tu proyecto
     // Si causan problemas, comentarlas
-    serverComponentsExternalPackages: [],
+    serverComponentsExternalPackages: []
   },
 };
 
