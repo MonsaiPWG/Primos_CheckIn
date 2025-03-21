@@ -16,7 +16,7 @@
     "@types/lodash": "^4.17.16",
     "ethers": "^5.7.2",
     "lodash": "^4.17.21",
-    "next": "15.2.2",
+    "next": "15.2.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "wagmi": "^0.12.19",
@@ -29,7 +29,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "15.2.2",
+    "eslint-config-next": "15.2.3",
     "ignore-loader": "^0.1.2",
     "tailwindcss": "^4",
     "typescript": "^5"
