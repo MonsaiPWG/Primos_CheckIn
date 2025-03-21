@@ -119,13 +119,21 @@ export default function Home() {
       <div style={{ position: "relative", zIndex: 1 }}>
         <header className="bg-gray-800 shadow">
           <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold text-white uppercase">
-                Primos Daily Check-in
-              </h1>
-              <p className="text-sm text-gray-400 mt-1">
-                Earn rewards with daily check-ins
-              </p>
+            <div className="flex items-center">
+              <img 
+                src="/images/primos_logo.png" 
+                alt="Primos Logo" 
+                style={{ width: '50px', height: 'auto' }}
+                className="mr-4"
+              />
+              <div>
+                <h1 className="text-3xl font-bold text-white uppercase">
+                  Primos Daily Check-in
+                </h1>
+                <p className="text-sm text-gray-400 mt-1">
+                  Earn rewards with daily check-ins
+                </p>
+              </div>
             </div>
             <div className="w-auto">
               <RoninWallet onConnect={handleConnect} onDisconnect={handleDisconnect} />
@@ -171,9 +179,17 @@ export default function Home() {
 
         <footer className="bg-gray-800 shadow mt-12">
           <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
-            <p className="text-center text-sm text-gray-400">
-              PRIMOS Daily Check-in App - {new Date().getFullYear()}
-            </p>
+            <div className="flex flex-col items-center">
+              <img 
+                src="/images/logo_pimos_footer.png" 
+                alt="Primos Logo" 
+                style={{ width: '80px', height: 'auto' }}
+                className="mb-2"
+              />
+              <p className="text-center text-sm text-gray-400">
+                PRIMOS Daily Check-in App - {new Date().getFullYear()}
+              </p>
+            </div>
           </div>
         </footer>
       </div>
