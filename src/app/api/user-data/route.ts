@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-// Create a Supabase client with the service role key for server-side operations
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+import { createClient } from '@/utils/supabase/server';
 
 export async function GET(req: NextRequest) {
+  const supabase = await createClient();
   try {
     // Get the wallet address from the URL parameters
     const url = new URL(req.url);
@@ -19,8 +15,8 @@ export async function GET(req: NextRequest) {
       );
     }
     
-    // Query the users table with the service role key
-    const { data, error } = await supabaseAdmin
+    // Query the users table
+    const { data, error } = await supabase
       .from('users')
       .select('*')
       .eq('wallet_address', walletAddress.toLowerCase())

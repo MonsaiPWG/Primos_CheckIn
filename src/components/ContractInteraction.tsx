@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import { getContract, retry, safeNumberFromBN, safeStringFromBN, directContractCall, RONIN_CHAIN_IDS } from '@/utils/contract';
-import { supabase } from '@/utils/supabase';
+import { createClient } from '@/utils/supabase/client';
 
 interface ContractInteractionProps {
   provider: ethers.providers.Web3Provider | null;
@@ -17,6 +17,7 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
   // Añade esta función
   const updateLeaderboardStreak = async (walletAddress: string, currentStreak: number) => {
     try {
+      const supabase = createClient();
       await supabase
         .from('leaderboard')
         .upsert(
@@ -106,9 +107,36 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
     resetState();
     
     const fetchContractData = async () => {
-      if (!provider) return;
+      if (!provider) {
+        console.error("Provider is not available");
+        return;
+      }
       
       console.log("Fetching data for new wallet connection...");
+      
+      // Verificar explícitamente si tenemos acceso a las cuentas
+      try {
+        // Esta es una verificación crítica para prevenir el error "unknown account #0"
+        const accounts = await provider.listAccounts();
+        if (!accounts || accounts.length === 0) {
+          if (isMounted) {
+            console.error("No accounts available - user may need to connect wallet");
+            setError('No accounts found in wallet. Please connect your wallet.');
+          }
+          return;
+        }
+        
+        // Si llegamos aquí, tenemos al menos una cuenta
+        const currentAddress = accounts[0];
+        console.log("Found account:", currentAddress);
+        
+        // Establecer la dirección actual - esto es importante para evitar llamadas a getAddress() más adelante
+        if (isMounted) setUserAddress(currentAddress);
+      } catch (accountError) {
+        console.error("Error accessing accounts:", accountError);
+        if (isMounted) setError('Error accessing wallet accounts. Please reconnect your wallet.');
+        return;
+      }
       
       // Get network information
       try {
@@ -187,23 +215,23 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
               await new Promise(resolve => setTimeout(resolve, 300));
               
               try {
-                // Get user's last check-in time with retry and fallback
-                let lastCheckInTime;
+                // Obtener datos del usuario para verificar el último check-in
                 try {
-                  lastCheckInTime = await retry(async () => {
-                    return await contract.getLastUpdatedPeriod(accounts[0]);
-                  });
-                } catch (innerErr) {
-                  console.error('Error calling getLastCheckIn, trying alternative approach:', innerErr);
-                  // Fallback to 0 if the call fails
-                  lastCheckInTime = ethers.BigNumber.from(0);
-                }
-                
-                if (isMounted) {
-                  if (!lastCheckInTime.isZero()) {
-                    // Get the current date as we need to display a proper date
+                  // Primero consultamos a la API para obtener datos del usuario
+                  const userResponse = await fetch(`/api/user-data?wallet_address=${accounts[0].toLowerCase()}`);
+                  const userData = await userResponse.json();
+                  
+                  if (userData.data && userData.data.last_check_in) {
+                    const lastCheckInDate = new Date(userData.data.last_check_in);
                     const now = new Date();
-                    // Format the date in Spanish style (day de month de year)
+                    
+                    // Verificar si el último check-in fue hoy
+                    if (lastCheckInDate.toDateString() === now.toDateString()) {
+                      console.log("Usuario ya hizo check-in hoy según la base de datos");
+                      if (isMounted) setHasCheckedIn(true);
+                    }
+                    
+                    // Format the date in Spanish style
                     const dateOptions: Intl.DateTimeFormatOptions = { 
                       year: 'numeric', 
                       month: 'long', 
@@ -215,12 +243,51 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
                       second: '2-digit',
                       hour12: false
                     };
-                    // Combine date and time
-                    const dateStr = now.toLocaleDateString('es-ES', dateOptions);
-                    const timeStr = now.toLocaleTimeString('es-ES', timeOptions);
+                    
+                    const dateStr = lastCheckInDate.toLocaleDateString('es-ES', dateOptions);
+                    const timeStr = lastCheckInDate.toLocaleTimeString('es-ES', timeOptions);
                     setLastCheckIn(`${dateStr}\n${timeStr}`);
                   } else {
                     setLastCheckIn('Never');
+                  }
+                } catch (apiErr) {
+                  console.error('Error al obtener datos de usuario desde API:', apiErr);
+                  
+                  // Si falla la API, intentamos obtener del contrato como fallback
+                  let lastCheckInTime;
+                  try {
+                    lastCheckInTime = await retry(async () => {
+                      return await contract.getLastUpdatedPeriod(accounts[0]);
+                    });
+                  } catch (innerErr) {
+                    console.error('Error calling getLastCheckIn, trying alternative approach:', innerErr);
+                    // Fallback to 0 if the call fails
+                    lastCheckInTime = ethers.BigNumber.from(0);
+                  }
+                  
+                  if (isMounted) {
+                    if (!lastCheckInTime.isZero()) {
+                      // Get the current date as we need to display a proper date
+                      const now = new Date();
+                      // Format the date in Spanish style (day de month de year)
+                      const dateOptions: Intl.DateTimeFormatOptions = { 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                      };
+                      const timeOptions: Intl.DateTimeFormatOptions = {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: false
+                      };
+                      // Combine date and time
+                      const dateStr = now.toLocaleDateString('es-ES', dateOptions);
+                      const timeStr = now.toLocaleTimeString('es-ES', timeOptions);
+                      setLastCheckIn(`${dateStr}\n${timeStr}`);
+                    } else {
+                      setLastCheckIn('Never');
+                    }
                   }
                 }
               } catch (timeErr: any) {
@@ -363,9 +430,38 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
       return;
     }
     
+    // Verificar si el usuario ya ha hecho check-in hoy
+    if (hasCheckedIn) {
+      setError('You have already checked in today. Please try again tomorrow.');
+      return;
+    }
+    
     setIsLoading(true);
     setError(null);
     setSuccess(null);
+    
+    // Verificar con la API si el usuario ya ha hecho check-in hoy
+    try {
+      // Obtenemos los datos del usuario para verificar el último check-in
+      const userDataResponse = await fetch(`/api/user-data?wallet_address=${userAddress.toLowerCase()}`);
+      const userData = await userDataResponse.json();
+      
+      if (userData.data && userData.data.last_check_in) {
+        const lastCheckIn = new Date(userData.data.last_check_in);
+        const now = new Date();
+        
+        // Verificar si el último check-in fue hoy
+        if (lastCheckIn.toDateString() === now.toDateString()) {
+          setIsLoading(false);
+          setError('You have already checked in today. Please try again tomorrow.');
+          setHasCheckedIn(true);
+          return;
+        }
+      }
+    } catch (verifyError) {
+      console.error('Error verificando check-in previo:', verifyError);
+      // Continuamos aunque falle la verificación
+    }
     
     try {
       const contract = await getContract(provider);
@@ -377,8 +473,10 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
         console.log("Attempting to check in with user address:", userAddress);
         
         try {
-          // Get user address to pass to checkIn
-          const userAddress = await provider.getSigner().getAddress();
+          // Usar directamente el userAddress que ya tenemos
+          // No intentamos obtener el signer address aquí para evitar el error
+          console.log("Proceeding with check-in for address:", userAddress);
+          
           // Call checkIn function with user's address
           const tx = await contract.checkIn(userAddress);
           

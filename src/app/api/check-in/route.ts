@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/utils/supabase';
+import { createClient } from '@/utils/supabase/server';
 import { ethers } from 'ethers';
 import { calculateNFTPoints } from '@/services/nftService';
 
 export async function POST(req: NextRequest) {
   try {
+    const supabase = await createClient();
     const { wallet_address, transaction_hash } = await req.json();
     
     if (!wallet_address) {

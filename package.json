@@ -11,6 +11,7 @@
   "dependencies": {
     "@sky-mavis/tanto-connect": "^0.0.11",
     "@sky-mavis/tanto-wagmi": "^0.0.6",
+    "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.49.1",
     "@types/lodash": "^4.17.16",
     "ethers": "^5.7.2",

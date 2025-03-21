@@ -87,6 +87,23 @@ export const getContract = async (provider: ethers.providers.Web3Provider): Prom
   }
   
   try {
+    let accounts: string[] = [];
+    
+    try {
+      // Obtener cuentas dentro de un try/catch para no interrumpir todo el flujo
+      accounts = await provider.listAccounts();
+      
+      if (!accounts || accounts.length === 0) {
+        console.warn('No accounts available in provider, but continuing with limited functionality');
+        // No lanzamos error aquí, permitimos continuar con funcionalidad limitada
+      } else {
+        console.log('Found accounts:', accounts);
+      }
+    } catch (accountsError) {
+      console.warn('Error listing accounts, but continuing with limited functionality:', accountsError);
+      // No lanzamos error aquí tampoco, permitimos continuar con funcionalidad limitada
+    }
+    
     // Get current network information
     const network = await provider.getNetwork();
     console.log(`Connected to network with chainId: ${network.chainId}`);
@@ -101,8 +118,17 @@ export const getContract = async (provider: ethers.providers.Web3Provider): Prom
     
     console.log(`Using contract address: ${contractAddress}`);
     
-    // Get the signer
-    const signer = provider.getSigner();
+    // Intentar obtener el signer de manera segura - este es un punto crítico
+    let signer;
+    try {
+      // Es posible que no tengamos cuentas, así que usamos getSigner() sin parámetros
+      // que es más confiable en este caso
+      signer = provider.getSigner();
+      console.log('Got signer successfully');
+    } catch (signerError) {
+      console.error('Error getting signer:', signerError);
+      throw new Error('Failed to get wallet signer. Please reconnect your wallet.');
+    }
     
     // Create the contract using the factory pattern
     const contract = CheckIn__factory.connect(contractAddress, signer);

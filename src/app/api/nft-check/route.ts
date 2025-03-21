@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-// Use the service role key for full database access
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+import { createClient } from '@/utils/supabase/server';
 
 export async function GET(req: NextRequest) {
+  const supabase = await createClient();
   try {
     const url = new URL(req.url);
     const walletAddress = url.searchParams.get('wallet_address');
@@ -19,7 +15,7 @@ export async function GET(req: NextRequest) {
     }
     
     // Query all NFTs registered for this wallet address
-    const { data: nfts, error: nftsError } = await supabaseAdmin
+    const { data: nfts, error: nftsError } = await supabase
       .from('nfts')
       .select('*')
       .eq('wallet_address', walletAddress.toLowerCase());
@@ -32,7 +28,7 @@ export async function GET(req: NextRequest) {
     }
     
     // Calculate total bonus points
-    const totalBonusPoints = nfts?.reduce((sum, nft) => sum + (nft.bonus_points || 0), 0) || 0;
+    const totalBonusPoints = nfts?.reduce((sum: number, nft: any) => sum + (nft.bonus_points || 0), 0) || 0;
     
     return NextResponse.json({
       count: nfts?.length || 0,

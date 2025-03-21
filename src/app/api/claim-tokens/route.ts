@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
 import { NextResponse } from 'next/server';
-import { supabase } from '@/utils/supabase';
+import { createClient } from '@/utils/supabase/server';
 import { createDirectWallet, getBlockNumberDirect, callRpcDirectly } from '@/utils/direct-rpc';
 import { logDetailedError } from '@/utils/retry-utils';
 
@@ -34,7 +34,7 @@ type RpcEndpoint = {
 };
 
 // Función para obtener el total de tokens reclamados por un usuario
-async function getUserTotalClaimedTokens(walletAddress: string) {
+async function getUserTotalClaimedTokens(walletAddress: string, supabase: any) {
   try {
     const { data, error } = await supabase
       .from('rewards')
@@ -43,7 +43,7 @@ async function getUserTotalClaimedTokens(walletAddress: string) {
       
     if (error) throw error;
     
-    return data.reduce((total, reward) => total + (reward.tokens_received || 0), 0);
+    return data.reduce((total: number, reward: any) => total + (reward.tokens_received || 0), 0);
   } catch (err) {
     console.error('Error fetching claimed tokens:', err);
     return 0;
@@ -70,6 +70,8 @@ export async function POST(request: Request) {
   console.log('Iniciando proceso de reclamación de tokens (endpoint simplificado)...');
   
   try {
+    const supabase = await createClient();
+    
     // Extraer datos del request
     const body = await request.json();
     const { walletAddress, amount } = body;
@@ -392,7 +394,7 @@ export async function POST(request: Request) {
         .from('leaderboard')
         .upsert({
           wallet_address: walletAddress.toLowerCase(),
-          tokens_claimed: await getUserTotalClaimedTokens(walletAddress),
+          tokens_claimed: await getUserTotalClaimedTokens(walletAddress, supabase),
           last_active: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }, { onConflict: 'wallet_address' });
