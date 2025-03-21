@@ -1,10 +1,19 @@
-import type { NextConfig } from "next";
+/** @type {import('next').NextConfig} */
 
-const nextConfig: NextConfig = {
+const nextConfig = {
   /* config options here */
   
   // Para Turbopack y Webpack, usar el directorio de salida estándar
   distDir: '.next',
+  
+  // Configurar webpack para manejar módulos faltantes como pino-pretty
+  webpack: (config) => {
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      'pino-pretty': false
+    };
+    return config;
+  },
   
   // Configurar ESLint
   eslint: {
@@ -36,8 +45,8 @@ const nextConfig: NextConfig = {
   experimental: {
     // Usar estas opciones sólo si son necesarias para tu proyecto
     // Si causan problemas, comentarlas
-    serverComponentsExternalPackages: [],
+    serverComponentsExternalPackages: []
   },
 };
 
-export default nextConfig;
+module.exports = nextConfig;
