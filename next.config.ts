@@ -3,29 +3,40 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   /* config options here */
   
-  // For Turbopack and Webpack, use standard output directory
+  // Para Turbopack y Webpack, usar el directorio de salida estándar
   distDir: '.next',
   
-  // Configure ESLint
+  // Configurar ESLint
   eslint: {
-    // Only run ESLint on these directories during build
+    // Sólo ejecutar ESLint en estos directorios durante la compilación
     dirs: ['src/app', 'src/components', 'src/hooks', 'src/services', 'src/utils'],
-    // We can safely ignore ESLint during builds
-    ignoreDuringBuilds: true,
+    // No ignorar errores de ESLint durante la compilación para Vercel
+    ignoreDuringBuilds: true, // Mantener true para evitar fallos en la compilación inicialmente
   },
   
-  // Ignore TypeScript errors during build
+  // Configuración de TypeScript
   typescript: {
-    // This will still show errors in the editor but won't fail the build
+    // Inicialmente mantener esta configuración para evitar que fallos de TypeScript impidan el despliegue
+    // Una vez que el despliegue sea exitoso, considerar cambiar a false para mayor seguridad
     ignoreBuildErrors: true,
   },
   
-  // Configure on-demand entries for Next.js dev server
+  // Configurar on-demand entries para el servidor de desarrollo de Next.js
   onDemandEntries: {
-    // Additional excluded directories can be specified here
-    // The default exclusions are already handled by Next.js
+    // Se pueden especificar directorios excluidos adicionales aquí
+    // Next.js ya maneja las exclusiones predeterminadas
     maxInactiveAge: 60 * 1000,
     pagesBufferLength: 2,
+  },
+
+  // Configuración adicional para optimización
+  swcMinify: true, // Usar SWC para minificación (más rápido que Terser)
+  
+  // Configuración experimental para el proyecto
+  experimental: {
+    // Usar estas opciones sólo si son necesarias para tu proyecto
+    // Si causan problemas, comentarlas
+    serverComponentsExternalPackages: [],
   },
 };
 
