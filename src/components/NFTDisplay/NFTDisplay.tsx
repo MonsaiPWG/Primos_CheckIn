@@ -160,41 +160,16 @@ const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshT
     return () => window.removeEventListener('resize', handleResize);
   }, []);
   
-  // Set up auto-rotation for carousel - marquee style
+  // Auto-rotation for carousel is disabled as requested
   useEffect(() => {
-    const startAutoRotation = () => {
-      if (autoRotateTimerRef.current) {
-        clearInterval(autoRotateTimerRef.current);
-      }
-      
-      autoRotateTimerRef.current = setInterval(() => {
-        if (!isPaused && nfts.length > itemsPerView) {
-          setCurrentSlide(prev => {
-            // Advance by 1, and smoothly loop back to start when reaching the end
-            const nextSlide = prev + 1;
-            const maxSlide = nfts.length - itemsPerView;
-            
-            // When we reach the end, loop back to the beginning
-            if (nextSlide > maxSlide) {
-              return 0;
-            }
-            
-            return nextSlide;
-          });
-        }
-      }, 2000); // Rotate every 2 seconds for a more noticeable marquee effect
-    };
-    
-    if (nfts.length > 0) {
-      startAutoRotation();
-    }
-    
+    // Cleanup function in case there was an existing timer
     return () => {
       if (autoRotateTimerRef.current) {
         clearInterval(autoRotateTimerRef.current);
+        autoRotateTimerRef.current = null;
       }
     };
-  }, [nfts.length, isPaused, itemsPerView]);
+  }, []);
   
   // Setup lazy loading with Intersection Observer
   const setupImageObserver = useCallback(() => {
