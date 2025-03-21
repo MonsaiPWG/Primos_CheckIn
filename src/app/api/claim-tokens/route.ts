@@ -389,15 +389,38 @@ export async function POST(request: Request) {
         console.error('Error al actualizar puntos del usuario:', updateError);
       }
       
-      // Actualizar leaderboard
+      // Primero obtener los datos existentes del leaderboard
+      const { data: existingLeaderboardData, error: fetchError } = await supabase
+        .from('leaderboard')
+        .select('*')
+        .eq('wallet_address', walletAddress.toLowerCase())
+        .single();
+      
+      // Preparar datos para actualizar, preservando valores existentes
+      const leaderboardData: any = {
+        wallet_address: walletAddress.toLowerCase(),
+        tokens_claimed: await getUserTotalClaimedTokens(walletAddress, supabase),
+        last_active: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      
+      // Si ya existía un registro, preservar los campos que no estamos actualizando
+      if (existingLeaderboardData && !fetchError) {
+        // Preservamos los campos que no estamos actualizando explícitamente
+        if (existingLeaderboardData.nft_count !== undefined) 
+          leaderboardData.nft_count = existingLeaderboardData.nft_count;
+        
+        if (existingLeaderboardData.best_streak !== undefined) 
+          leaderboardData.best_streak = existingLeaderboardData.best_streak;
+          
+        if (existingLeaderboardData.current_streak !== undefined) 
+          leaderboardData.current_streak = existingLeaderboardData.current_streak;
+      }
+      
+      // Actualizar leaderboard con todos los datos
       const { error: leaderboardError } = await supabase
         .from('leaderboard')
-        .upsert({
-          wallet_address: walletAddress.toLowerCase(),
-          tokens_claimed: await getUserTotalClaimedTokens(walletAddress, supabase),
-          last_active: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'wallet_address' });
+        .upsert(leaderboardData, { onConflict: 'wallet_address' });
       
       if (leaderboardError) {
         console.error('Error al actualizar leaderboard:', leaderboardError);

@@ -18,20 +18,43 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
   const updateLeaderboardStreak = async (walletAddress: string, currentStreak: number) => {
     try {
       const supabase = createClient();
+      
+      // Primero obtener los datos existentes del leaderboard
+      const { data: existingData, error: fetchError } = await supabase
+        .from('leaderboard')
+        .select('*')
+        .eq('wallet_address', walletAddress.toLowerCase())
+        .single();
+      
+      // Preparar datos para actualizar
+      const leaderboardData: any = {
+        wallet_address: walletAddress.toLowerCase(),
+        current_streak: currentStreak,
+        best_streak: currentStreak, // Actualizar best streak con el valor actual
+        last_active: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      
+      // Si ya existía un registro, preservar los campos que no estamos actualizando
+      if (existingData && !fetchError) {
+        // Si el best_streak existente es mayor que el current_streak, mantenerlo
+        if (existingData.best_streak !== undefined && existingData.best_streak > currentStreak) {
+          leaderboardData.best_streak = existingData.best_streak;
+        }
+        
+        // Preservamos los campos que no estamos actualizando explícitamente
+        if (existingData.tokens_claimed !== undefined) 
+          leaderboardData.tokens_claimed = existingData.tokens_claimed;
+        
+        if (existingData.nft_count !== undefined) 
+          leaderboardData.nft_count = existingData.nft_count;
+      }
+      
+      // Actualizar leaderboard con todos los datos
       await supabase
         .from('leaderboard')
-        .upsert(
-          {
-            wallet_address: walletAddress.toLowerCase(),
-            current_streak: currentStreak,
-            best_streak: currentStreak,
-            last_active: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          },
-          {
-            onConflict: 'wallet_address'
-          }
-        );
+        .upsert(leaderboardData, { onConflict: 'wallet_address' });
+        
     } catch (err) {
       console.error('Error updating leaderboard streak:', err);
     }
@@ -244,8 +267,8 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
                       hour12: false
                     };
                     
-                    const dateStr = lastCheckInDate.toLocaleDateString('es-ES', dateOptions);
-                    const timeStr = lastCheckInDate.toLocaleTimeString('es-ES', timeOptions);
+                    const dateStr = lastCheckInDate.toLocaleDateString('en-US', dateOptions);
+                    const timeStr = lastCheckInDate.toLocaleTimeString('en-US', timeOptions);
                     setLastCheckIn(`${dateStr}\n${timeStr}`);
                   } else {
                     setLastCheckIn('Never');
@@ -282,8 +305,8 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
                         hour12: false
                       };
                       // Combine date and time
-                      const dateStr = now.toLocaleDateString('es-ES', dateOptions);
-                      const timeStr = now.toLocaleTimeString('es-ES', timeOptions);
+                      const dateStr = now.toLocaleDateString('en-US', dateOptions);
+                      const timeStr = now.toLocaleTimeString('en-US', timeOptions);
                       setLastCheckIn(`${dateStr}\n${timeStr}`);
                     } else {
                       setLastCheckIn('Never');
@@ -583,8 +606,8 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
             hour12: false
           };
           // Combine date and time
-          const dateStr = now.toLocaleDateString('es-ES', dateOptions);
-          const timeStr = now.toLocaleTimeString('es-ES', timeOptions);
+          const dateStr = now.toLocaleDateString('en-US', dateOptions);
+          const timeStr = now.toLocaleTimeString('en-US', timeOptions);
           setLastCheckIn(`${dateStr}\n${timeStr}`);
           
           // Also refresh the check-in status
@@ -680,11 +703,11 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         {/* Column 1: Current Streak */}
         <div className="bg-gray-700 p-4 rounded-md">
-          <div className="flex items-center">
+          <div className="flex items-start">
             <img 
               src="/images/streak.png" 
               alt="Streak" 
-              className="h-12 w-12 mr-3" 
+              className="h-14 w-14 mr-3" 
             />
             <div>
               <h3 className="font-bold text-lg text-white">Current Streak</h3>
@@ -695,8 +718,17 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
         
         {/* Column 2: Last Check-in */}
         <div className="bg-gray-700 p-4 rounded-md">
-          <p className="text-sm text-gray-400">Last Check-in:</p>
-          <p className="font-bold whitespace-pre-line text-white">{lastCheckIn}</p>
+          <div className="flex items-start">
+            <img 
+              src="/images/reloj_primos.png" 
+              alt="Last Check-in" 
+              className="h-14 w-14 mr-3" 
+            />
+            <div>
+              <h3 className="font-bold text-lg text-white">Last Check-in:</h3>
+              <p className="font-bold whitespace-pre-line text-white">{lastCheckIn}</p>
+            </div>
+          </div>
         </div>
       </div>
       

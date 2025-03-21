@@ -293,19 +293,38 @@ export async function calculateNFTPoints(walletAddress: string) {
 
 export async function updateLeaderboardNFTData(walletAddress: string, nftCount: number, totalBonusPoints: number) {
   try {
+    // Primero obtener los datos existentes del leaderboard
+    const { data: existingData, error: fetchError } = await supabase
+      .from('leaderboard')
+      .select('*')
+      .eq('wallet_address', walletAddress.toLowerCase())
+      .single();
+    
+    // Preparar datos para actualizar
+    const leaderboardData: any = {
+      wallet_address: walletAddress.toLowerCase(),
+      nft_count: nftCount,
+      updated_at: new Date().toISOString(),
+      last_active: new Date().toISOString(),
+    };
+    
+    // Si ya existía un registro, preservar los campos que no estamos actualizando
+    if (existingData && !fetchError) {
+      // Preservamos los campos que no estamos actualizando explícitamente
+      if (existingData.tokens_claimed !== undefined) 
+        leaderboardData.tokens_claimed = existingData.tokens_claimed;
+      
+      if (existingData.best_streak !== undefined) 
+        leaderboardData.best_streak = existingData.best_streak;
+        
+      if (existingData.current_streak !== undefined) 
+        leaderboardData.current_streak = existingData.current_streak;
+    }
+    
+    // Actualizar leaderboard con todos los datos
     const { data, error } = await supabase
       .from('leaderboard')
-      .upsert(
-        {
-          wallet_address: walletAddress.toLowerCase(),
-          nft_count: nftCount,
-          updated_at: new Date().toISOString(),
-          last_active: new Date().toISOString(),
-        },
-        {
-          onConflict: 'wallet_address'
-        }
-      );
+      .upsert(leaderboardData, { onConflict: 'wallet_address' });
     
     if (error) throw error;
     
