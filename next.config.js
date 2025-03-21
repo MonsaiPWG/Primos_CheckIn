@@ -6,6 +6,15 @@ const nextConfig = {
   // Para Turbopack y Webpack, usar el directorio de salida estándar
   distDir: '.next',
   
+  // Configurar webpack para manejar módulos faltantes como pino-pretty
+  webpack: (config) => {
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      'pino-pretty': false
+    };
+    return config;
+  },
+  
   // Configurar ESLint
   eslint: {
     // Sólo ejecutar ESLint en estos directorios durante la compilación
