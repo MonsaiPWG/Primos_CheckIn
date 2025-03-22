@@ -3,11 +3,34 @@
 import React from 'react';
 
 const HowRewardsWorks: React.FC = () => {
+  // Get the current UTC time for display
+  const nowUTC = new Date();
+  const utcHours = nowUTC.getUTCHours();
+  const utcMinutes = nowUTC.getUTCMinutes();
+  const formattedUTCTime = `${utcHours.toString().padStart(2, '0')}:${utcMinutes.toString().padStart(2, '0')}`;
   return (
     <div className="">
       <h3 className="text-xl font-bold mb-4 uppercase">How bonuses work</h3>
       <p className="text-sm mt-2">Your Primos provide bonuses based on their rarity. By maintaining daily streaks, you'll unlock increasingly powerful multipliers.</p>
       <p className="text-sm font-semibold">NFTs Bonus x Streak Multiplier = Fire Dust Rewards</p>
+      
+      <div className="mt-3 p-3 bg-blue-900 text-white rounded-md">
+        <h4 className="text-md font-bold flex items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          Daily Reset Time
+        </h4>
+        <p className="text-sm mt-1">
+          Primos and check-ins reset at <span className="font-bold">00:00 UTC</span> each day.
+        </p>
+        <p className="text-sm mt-1">
+          Current UTC time: <span className="font-bold">{formattedUTCTime} UTC</span>
+        </p>
+        <p className="text-xs mt-1 text-blue-200">
+          Once a new UTC day begins, you can check in again and use your Primos for new bonuses.
+        </p>
+      </div>
       
       <div className="mt-4">
         <details className="bg-gray-700 p-3 rounded-md mb-2 shadow-sm text-white">

@@ -55,20 +55,12 @@ export async function POST(req: NextRequest) {
         }, { status: 400 });
       }
       
-      // Comprobar si han pasado al menos 24 horas desde el último check-in
+      // Calculamos la diferencia en días para el streak
       const timeDiff = Math.abs(nowUTC.getTime() - lastCheckInUTC.getTime());
-      const hoursDiff = timeDiff / (1000 * 3600);
       const daysDiff = Math.floor(timeDiff / (1000 * 3600 * 24));
       
-      if (hoursDiff < 24) {
-        return NextResponse.json({ 
-          error: 'Must wait 24 hours between check-ins',
-          user,
-          hours_remaining: Math.ceil(24 - hoursDiff)
-        }, { status: 400 });
-      }
-      
       // Si es el día siguiente, incrementar streak
+      // Si hay más de un día de diferencia, reiniciar el streak
       const newStreak = daysDiff === 1 ? user.current_streak + 1 : 1;
       
       const { data: updatedUser, error: updateError } = await supabase

@@ -450,7 +450,7 @@ const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshT
                         <h4 className="font-bold">{nft.metadata?.name || `NFT #${nft.tokenId}`}</h4>
                         <p className="text-sm text-gray-300">Bonus: +{nft.bonusPoints}</p>
                         {nft.isUsedToday ? (
-                          <p className="text-xs text-red-400 mt-1">Available tomorrow</p>
+                          <p className="text-xs text-red-400 mt-1">Available at 00:00 UTC</p>
                         ) : (
                           <p className="text-xs text-green-400 mt-1">Available now</p>
                         )}

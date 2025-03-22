@@ -813,7 +813,7 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
       
       {hasCheckedIn && nextCheckInTime && (
         <div className="text-center mb-4">
-          <p className="text-sm text-gray-400">Next check-in available in: {nextCheckInTime} (UTC)</p>
+          <p className="text-sm text-gray-400">Next check-in available in: {nextCheckInTime}</p>
         </div>
       )}
       
