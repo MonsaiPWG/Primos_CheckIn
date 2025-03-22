@@ -7,6 +7,7 @@ import RoninWallet from '@/components/wallet-connectors/ronin-wallet/RoninWallet
 import NFTDisplay from '@/components/NFTDisplay/NFTDisplay';
 import RewardsPanel from '@/components/RewardsPanel/RewardsPanel';
 import LeaderboardDisplay from '@/components/LeaderboardDisplay/LiderboardDisplay';
+import HowRewardsWorks from '@/components/NFTDisplay/HowRewardsWorks';
 import { RONIN_CHAIN_IDS } from '@/utils/contract';
 import { supabase } from '@/utils/supabase';
 
@@ -16,6 +17,7 @@ export default function Home() {
   const [userAddress, setUserAddress] = useState<string | null>(null);
   const [totalPoints, setTotalPoints] = useState<number>(0);
   const [userDataRefresh, setUserDataRefresh] = useState<number>(0);
+  const [nftCalculationInProgress, setNftCalculationInProgress] = useState<boolean>(false);
 
   // Función para obtener el nombre de la red
   const getNetworkName = (chainId: number): string => {
@@ -143,19 +145,22 @@ export default function Home() {
 
         <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
-            {provider && (
+            {provider ? (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="md:col-span-2">
                   <ContractInteraction 
                     provider={provider} 
                     userAddress={userAddress}
-                    onCheckInSuccess={handleDataRefresh} 
+                    onCheckInSuccess={handleDataRefresh}
+                    nftCalculationInProgress={nftCalculationInProgress}
+                    refreshTrigger={userDataRefresh} // Add refreshTrigger prop
                   />
                   
                   <NFTDisplay 
                     provider={provider} 
                     userAddress={userAddress}
                     refreshTrigger={userDataRefresh}
+                    onLoadingStateChange={setNftCalculationInProgress}
                   />
                 </div>
                 
@@ -171,6 +176,41 @@ export default function Home() {
                 {/* Nuevo componente de leaderboard */}
                 <div className="md:col-span-3 mt-6">
                   <LeaderboardDisplay />
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center space-y-8">
+                {/* Logo de Primos */}
+                <div className="w-64 mx-auto">
+                  <img 
+                    src="/images/logo_primos_inicio.png" 
+                    alt="Primos Logo" 
+                    className="w-full h-auto"
+                  />
+                </div>
+                
+                {/* Mensaje de bienvenida (en inglés como solicitado) */}
+                <h2 className="text-2xl font-bold text-white text-center">
+                  Connect your Ronin Wallet and start earning rewards
+                </h2>
+                
+                {/* Video con preview */}
+                <div className="w-full max-w-3xl mx-auto">
+                  <video 
+                    src="/videos/primos_o.webm" 
+                    autoPlay
+                    loop
+                    controls
+                    muted
+                    playsInline
+                    className="w-full rounded-lg"
+                    poster="/images/frame_primo.png"
+                  />
+                </div>
+                
+                {/* Componente How Rewards Works con texto en blanco */}
+                <div className="w-full max-w-3xl mx-auto bg-gray-800 rounded-lg shadow-md p-6 text-white">
+                  <HowRewardsWorks />
                 </div>
               </div>
             )}

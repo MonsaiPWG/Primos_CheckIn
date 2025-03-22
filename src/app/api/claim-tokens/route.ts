@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { createDirectWallet, getBlockNumberDirect, callRpcDirectly } from '@/utils/direct-rpc';
 import { logDetailedError } from '@/utils/retry-utils';
+import { updateLeaderboard } from '@/utils/supabase';
 
 // Configuración
 const TOKEN_CONTRACT_ADDRESS = '0xE3a334D6b7681D0151b81964CAf6353905e24B1b'; // Fire Dust
@@ -43,7 +44,14 @@ async function getUserTotalClaimedTokens(walletAddress: string, supabase: any) {
       
     if (error) throw error;
     
-    return data.reduce((total: number, reward: any) => total + (reward.tokens_received || 0), 0);
+    console.log('Rewards data for wallet', walletAddress, ':', data);
+    
+    // Calcula el total sumando los tokens_received
+    const totalClaimed = data.reduce((total: number, reward: any) => total + (reward.tokens_received || 0), 0);
+    
+    console.log('Total claimed tokens calculated from rewards:', totalClaimed);
+    
+    return totalClaimed;
   } catch (err) {
     console.error('Error fetching claimed tokens:', err);
     return 0;
@@ -94,6 +102,8 @@ export async function POST(request: Request) {
     }
 
     // Verificar que el usuario tenga suficientes puntos
+    // Nota: El claimeo NO tiene restricciones de tiempo - los usuarios pueden reclamar 
+    // en cualquier momento siempre que tengan suficientes puntos acumulados
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select('total_points, id')
@@ -389,40 +399,16 @@ export async function POST(request: Request) {
         console.error('Error al actualizar puntos del usuario:', updateError);
       }
       
-      // Primero obtener los datos existentes del leaderboard
-      const { data: existingLeaderboardData, error: fetchError } = await supabase
-        .from('leaderboard')
-        .select('*')
-        .eq('wallet_address', walletAddress.toLowerCase())
-        .single();
+      // Obtener el total de tokens reclamados por el usuario
+      const totalTokensClaimed = await getUserTotalClaimedTokens(walletAddress, supabase);
       
-      // Preparar datos para actualizar, preservando valores existentes
-      const leaderboardData: any = {
-        wallet_address: walletAddress.toLowerCase(),
-        tokens_claimed: await getUserTotalClaimedTokens(walletAddress, supabase),
-        last_active: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
+      // Usar la función centralizada para actualizar el leaderboard
+      const { success, error: leaderboardError } = await updateLeaderboard(walletAddress, {
+        tokens_claimed: totalTokensClaimed,
+        last_active: new Date().toISOString()
+      });
       
-      // Si ya existía un registro, preservar los campos que no estamos actualizando
-      if (existingLeaderboardData && !fetchError) {
-        // Preservamos los campos que no estamos actualizando explícitamente
-        if (existingLeaderboardData.nft_count !== undefined) 
-          leaderboardData.nft_count = existingLeaderboardData.nft_count;
-        
-        if (existingLeaderboardData.best_streak !== undefined) 
-          leaderboardData.best_streak = existingLeaderboardData.best_streak;
-          
-        if (existingLeaderboardData.current_streak !== undefined) 
-          leaderboardData.current_streak = existingLeaderboardData.current_streak;
-      }
-      
-      // Actualizar leaderboard con todos los datos
-      const { error: leaderboardError } = await supabase
-        .from('leaderboard')
-        .upsert(leaderboardData, { onConflict: 'wallet_address' });
-      
-      if (leaderboardError) {
+      if (!success || leaderboardError) {
         console.error('Error al actualizar leaderboard:', leaderboardError);
       }
       

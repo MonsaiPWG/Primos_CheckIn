@@ -199,7 +199,7 @@ const RoninWallet: FC<RoninWalletProps> = ({ onConnect, onDisconnect }) => {
         <button 
           onClick={connectWallet} 
           disabled={connecting}
-          className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-full hover:bg-blue-700 disabled:bg-blue-300"
+          className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 disabled:bg-blue-300"
         >
           {connecting ? 'Connecting...' : 'Connect Wallet'}
         </button>
@@ -213,12 +213,12 @@ const RoninWallet: FC<RoninWalletProps> = ({ onConnect, onDisconnect }) => {
       
       <WillRender when={isConnected}>
         <div className="flex flex-row items-center justify-between gap-3">
-          <div className="text-xs font-medium px-3 py-1.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full border border-gray-200 dark:border-gray-600">
+          <div className="text-sm font-medium px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded border border-gray-200 dark:border-gray-600">
             {account ? `${account.substring(0, 6)}...${account.substring(account.length - 4)}` : 'Unknown'}
           </div>
           <button
             onClick={disconnectWallet}
-            className="px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-full hover:bg-red-700"
+            className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700"
           >
             Disconnect
           </button>

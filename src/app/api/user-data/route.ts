@@ -22,6 +22,31 @@ export async function GET(req: NextRequest) {
       .eq('wallet_address', walletAddress.toLowerCase())
       .single();
       
+    // If we have data, add UTC check-in status
+    if (data && data.last_check_in) {
+      const lastCheckInUTC = new Date(data.last_check_in);
+      const nowUTC = new Date();
+      
+      // Check if user has already checked in today (UTC)
+      data.checked_in_today_utc = (
+        lastCheckInUTC.getUTCDate() === nowUTC.getUTCDate() && 
+        lastCheckInUTC.getUTCMonth() === nowUTC.getUTCMonth() && 
+        lastCheckInUTC.getUTCFullYear() === nowUTC.getUTCFullYear()
+      );
+      
+      // Calculate hours remaining until 24 hours have passed
+      const timeDiff = Math.abs(nowUTC.getTime() - lastCheckInUTC.getTime());
+      const hoursDiff = timeDiff / (1000 * 3600);
+      data.hours_since_last_checkin = hoursDiff;
+      
+      if (hoursDiff < 24) {
+        data.can_checkin = false;
+        data.hours_remaining = Math.ceil(24 - hoursDiff);
+      } else {
+        data.can_checkin = !data.checked_in_today_utc;
+      }
+    }
+      
     if (error) {
       // If user not found, return empty data instead of error
       if (error.code === 'PGRST116') {

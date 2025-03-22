@@ -4,7 +4,7 @@ import React from 'react';
 
 const HowRewardsWorks: React.FC = () => {
   return (
-    <div className="mt-8">
+    <div className="">
       <h3 className="text-xl font-bold mb-4 uppercase">How bonuses work</h3>
       <p className="text-sm mt-2">Your Primos provide bonuses based on their rarity. By maintaining daily streaks, you'll unlock increasingly powerful multipliers.</p>
       <p className="text-sm font-semibold">NFTs Bonus x Streak Multiplier = Fire Dust Rewards</p>

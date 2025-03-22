@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { ethers } from 'ethers';
 import { calculateNFTPoints } from '@/services/nftService';
+import { updateLeaderboard } from '@/utils/supabase';
 
 export async function POST(req: NextRequest) {
   try {
@@ -40,14 +41,30 @@ export async function POST(req: NextRequest) {
       const lastCheckIn = new Date(user.last_check_in);
       const now = new Date();
       
-      // Verificar si es un nuevo día (24 horas después del último check-in)
-      const timeDiff = Math.abs(now.getTime() - lastCheckIn.getTime());
+      // Convertir ambas fechas a UTC para comparación consistente
+      const lastCheckInUTC = new Date(user.last_check_in);
+      const nowUTC = new Date();
+      
+      // Comparar el día UTC para determinar si ya hizo check-in hoy
+      if (lastCheckInUTC.getUTCDate() === nowUTC.getUTCDate() && 
+          lastCheckInUTC.getUTCMonth() === nowUTC.getUTCMonth() && 
+          lastCheckInUTC.getUTCFullYear() === nowUTC.getUTCFullYear()) {
+        return NextResponse.json({ 
+          error: 'Already checked in today (UTC)',
+          user
+        }, { status: 400 });
+      }
+      
+      // Comprobar si han pasado al menos 24 horas desde el último check-in
+      const timeDiff = Math.abs(nowUTC.getTime() - lastCheckInUTC.getTime());
+      const hoursDiff = timeDiff / (1000 * 3600);
       const daysDiff = Math.floor(timeDiff / (1000 * 3600 * 24));
       
-      if (daysDiff === 0) {
+      if (hoursDiff < 24) {
         return NextResponse.json({ 
-          error: 'Already checked in today',
-          user
+          error: 'Must wait 24 hours between check-ins',
+          user,
+          hours_remaining: Math.ceil(24 - hoursDiff)
         }, { status: 400 });
       }
       
@@ -84,13 +101,10 @@ export async function POST(req: NextRequest) {
     // Si no tiene NFTs, no asignar puntos
     const basePoints = totalPoints > 0 ? totalPoints : 0;
     
-    // Aplicar Math.round() solo cuando el multiplicador tiene decimales
-    let pointsEarned;
-    if (multiplier === 1.5 || multiplier === 2.5) {
-      pointsEarned = Math.round(basePoints * multiplier);
-    } else {
-      pointsEarned = basePoints * multiplier;
-    }
+    // Calcular puntos ganados aplicando el multiplicador
+    console.log(`Calculando puntos: Base=${basePoints}, Multiplicador=${multiplier}`);
+    const pointsEarned = Math.round(basePoints * multiplier);
+    console.log(`Puntos ganados después de aplicar multiplicador: ${pointsEarned}`);
     
     // Registrar el check-in
     const { data: checkIn, error: checkInError } = await supabase
@@ -146,6 +160,25 @@ export async function POST(req: NextRequest) {
       .eq('wallet_address', wallet_address.toLowerCase());
     
     if (pointsError) throw pointsError;
+    
+    // Obtener tokens reclamados para asegurarnos de preservar ese valor
+    const { data: leaderboardData } = await supabase
+      .from('leaderboard')
+      .select('tokens_claimed')
+      .eq('wallet_address', wallet_address.toLowerCase())
+      .single();
+      
+    console.log('Datos del leaderboard actuales:', leaderboardData);
+    
+    // Actualizar el leaderboard con la información correcta de streak
+    await updateLeaderboard(wallet_address, {
+      best_streak: user.max_streak,
+      current_streak: user.current_streak,
+      points_earned: pointsEarned + (user.total_points || 0),
+      last_active: new Date().toISOString(),
+      // Conservar tokens_claimed si existe, no lo actualizamos aquí
+      tokens_claimed: leaderboardData?.tokens_claimed || 0
+    });
     
     return NextResponse.json({
       success: true,

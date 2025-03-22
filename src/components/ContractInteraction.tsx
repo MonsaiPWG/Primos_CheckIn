@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ethers } from 'ethers';
 import { getContract, retry, safeNumberFromBN, safeStringFromBN, directContractCall, RONIN_CHAIN_IDS } from '@/utils/contract';
 import { createClient } from '@/utils/supabase/client';
@@ -9,9 +9,11 @@ interface ContractInteractionProps {
   provider: ethers.providers.Web3Provider | null;
   onCheckInSuccess?: () => void;
   userAddress?: string | null;
+  nftCalculationInProgress?: boolean;
+  refreshTrigger?: number; // New prop to trigger updates
 }
 
-const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onCheckInSuccess, userAddress: externalUserAddress }) => {
+const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onCheckInSuccess, userAddress: externalUserAddress, nftCalculationInProgress, refreshTrigger }) => {
   const [streak, setStreak] = useState<number>(0);
   const [nextCheckInTime, setNextCheckInTime] = useState<string>('');
   // Añade esta función
@@ -66,8 +68,34 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const successTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Auto-hide success message after 5 seconds
+  useEffect(() => {
+    // Clear any existing timer when success changes
+    if (successTimerRef.current) {
+      clearTimeout(successTimerRef.current);
+      successTimerRef.current = null;
+    }
+    
+    // If we have a success message, set a timer to clear it
+    if (success) {
+      successTimerRef.current = setTimeout(() => {
+        setSuccess(null);
+      }, 5000); // 5 seconds
+    }
+    
+    // Cleanup function to clear timer on unmount
+    return () => {
+      if (successTimerRef.current) {
+        clearTimeout(successTimerRef.current);
+      }
+    };
+  }, [success]);
   const [userAddress, setUserAddress] = useState<string | null>(null);
   const [networkInfo, setNetworkInfo] = useState<{ chainId: number; networkName: string } | null>(null);
+  const [showAnimation, setShowAnimation] = useState<boolean>(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   // Function to get network name from chain ID
   const getNetworkName = (chainId: number): string => {
@@ -120,7 +148,7 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
     };
     
     loadStreakData();
-  }, [externalUserAddress]);
+  }, [externalUserAddress, refreshTrigger]); // Added refreshTrigger as a dependency
 
   useEffect(() => {
     // Flag to prevent state updates if the component unmounts
@@ -244,32 +272,39 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
                   const userResponse = await fetch(`/api/user-data?wallet_address=${accounts[0].toLowerCase()}`);
                   const userData = await userResponse.json();
                   
-                  if (userData.data && userData.data.last_check_in) {
-                    const lastCheckInDate = new Date(userData.data.last_check_in);
-                    const now = new Date();
-                    
-                    // Verificar si el último check-in fue hoy
-                    if (lastCheckInDate.toDateString() === now.toDateString()) {
-                      console.log("Usuario ya hizo check-in hoy según la base de datos");
+                  if (userData.data) {
+                    if (userData.data.checked_in_today_utc === true) {
+                      console.log("Usuario ya hizo check-in hoy (UTC) según la base de datos");
                       if (isMounted) setHasCheckedIn(true);
+                    } else if (userData.data.hours_since_last_checkin < 24) {
+                      console.log(`Debe esperar ${userData.data.hours_remaining} horas más para hacer check-in`);
+                      if (isMounted) {
+                        setError(`You must wait ${userData.data.hours_remaining} hours before checking in again`);
+                      }
                     }
                     
-                    // Format the date in Spanish style
-                    const dateOptions: Intl.DateTimeFormatOptions = { 
-                      year: 'numeric', 
-                      month: 'long', 
-                      day: 'numeric' 
-                    };
-                    const timeOptions: Intl.DateTimeFormatOptions = {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      second: '2-digit',
-                      hour12: false
-                    };
-                    
-                    const dateStr = lastCheckInDate.toLocaleDateString('en-US', dateOptions);
-                    const timeStr = lastCheckInDate.toLocaleTimeString('en-US', timeOptions);
-                    setLastCheckIn(`${dateStr}\n${timeStr}`);
+                    if (userData.data.last_check_in) {
+                      const lastCheckInDate = new Date(userData.data.last_check_in);
+                      
+                      // Format the date in Spanish style
+                      const dateOptions: Intl.DateTimeFormatOptions = { 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                      };
+                      const timeOptions: Intl.DateTimeFormatOptions = {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: false
+                      };
+                      
+                      const dateStr = lastCheckInDate.toLocaleDateString('en-US', dateOptions);
+                      const timeStr = lastCheckInDate.toLocaleTimeString('en-US', timeOptions);
+                      setLastCheckIn(`${dateStr}\n${timeStr}`);
+                    } else {
+                      setLastCheckIn('Never');
+                    }
                   } else {
                     setLastCheckIn('Never');
                   }
@@ -411,15 +446,16 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
     };
   }, [provider]); // Removed lastCheckIn from dependency to prevent infinite loops
 
-  // Countdown to next check-in
+  // Countdown to next check-in (based on UTC midnight)
   useEffect(() => {
     if (!hasCheckedIn) return;
 
     const calculateTimeLeft = () => {
       const now = new Date();
+      
+      // Calculate time until the next UTC midnight
       const tomorrow = new Date(now);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      tomorrow.setHours(0, 0, 0, 0);
+      tomorrow.setUTCHours(24, 0, 0, 0); // Next UTC midnight
       
       const difference = tomorrow.getTime() - now.getTime();
       
@@ -460,6 +496,7 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
     }
     
     setIsLoading(true);
+    setShowAnimation(true); // Show animation when check-in starts
     setError(null);
     setSuccess(null);
     
@@ -469,17 +506,23 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
       const userDataResponse = await fetch(`/api/user-data?wallet_address=${userAddress.toLowerCase()}`);
       const userData = await userDataResponse.json();
       
-      if (userData.data && userData.data.last_check_in) {
-        const lastCheckIn = new Date(userData.data.last_check_in);
-        const now = new Date();
-        
-        // Verificar si el último check-in fue hoy
-        if (lastCheckIn.toDateString() === now.toDateString()) {
-          setIsLoading(false);
-          setError('You have already checked in today. Please try again tomorrow.');
-          setHasCheckedIn(true);
-          return;
-        }
+      if (userData.data) {
+        // Check for UTC day verification
+          if (userData.data.checked_in_today_utc) {
+            setIsLoading(false);
+            setShowAnimation(false); // Hide animation on error
+            setError('You have already checked in today (UTC). Please try again tomorrow.');
+            setHasCheckedIn(true);
+            return;
+          }
+          
+          // Check for 24 hour period
+          if (userData.data.hours_since_last_checkin < 24) {
+            setIsLoading(false);
+            setShowAnimation(false); // Hide animation on error
+            setError(`You must wait ${userData.data.hours_remaining} hours before checking in again.`);
+            return;
+          }
       }
     } catch (verifyError) {
       console.error('Error verificando check-in previo:', verifyError);
@@ -564,10 +607,12 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
           if (checkInError.message && checkInError.message.includes("already checked in")) {
             setError("You have already checked in today. Please try again tomorrow.");
             setIsLoading(false);
+            setShowAnimation(false); // Hide animation on error
             return;
           } else if (checkInError.message && checkInError.message.includes("execution reverted")) {
             setError("The contract rejected the transaction. You may have already checked in today or another condition prevented the check-in.");
             setIsLoading(false);
+            setShowAnimation(false); // Hide animation on error
             return;
           } else {
             // Re-throw for the outer catch block to handle
@@ -683,6 +728,7 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
       setError('Failed to interact with contract. Check if the contract address is correct.');
     } finally {
       setIsLoading(false);
+      setShowAnimation(false); // Hide animation when check-in completes
     }
   };
 
@@ -733,17 +779,41 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
       </div>
       
       <button
+        ref={buttonRef}
         onClick={handleCheckIn}
-        disabled={isLoading || hasCheckedIn}
+        disabled={isLoading || hasCheckedIn || nftCalculationInProgress}
         className="w-full px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-300 mb-4"
       >
-        {isLoading ? 'Processing...' : hasCheckedIn ? 'Already Checked In Today' : 'Check In Now'}
+        {isLoading ? 'Processing...' : 
+         hasCheckedIn ? 'Already Checked In Today' : 
+         nftCalculationInProgress ? 'Calculating NFT Rewards...' : 
+         'Check In Now'}
       </button>
+      
+      {/* Animation between button and cards */}
+      {showAnimation && (
+        <div className="mb-4">
+          <video 
+            src="/videos/bucle_o.webm"
+            autoPlay
+            loop
+            muted
+            className="w-full h-auto"
+          />
+        </div>
+      )}
+      
+      {nftCalculationInProgress && (
+        <div className="text-center mb-4">
+          <p className="text-sm text-yellow-400">
+            Please wait while we calculate your NFT rewards. This may take a moment for large collections.
+          </p>
+        </div>
+      )}
       
       {hasCheckedIn && nextCheckInTime && (
         <div className="text-center mb-4">
-          <p className="text-sm text-gray-600">Next check-in available in: {nextCheckInTime}</p>
-         
+          <p className="text-sm text-gray-400">Next check-in available in: {nextCheckInTime} (UTC)</p>
         </div>
       )}
       

@@ -10,14 +10,17 @@ interface NFTDisplayProps {
   provider: ethers.providers.Web3Provider | null;
   userAddress: string | null;
   refreshTrigger?: number; // New prop to trigger updates
+  onLoadingStateChange?: (isLoading: boolean) => void; // Add new prop for callback
 }
 
-const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshTrigger }) => {
+const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshTrigger, onLoadingStateChange }) => {
   const [nfts, setNfts] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [syncingNFTs, setSyncingNFTs] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [points, setPoints] = useState<number>(0);
+  const [eligiblePoints, setEligiblePoints] = useState<number>(0);
+  const [totalBonusPoints, setTotalBonusPoints] = useState<number>(0);
+  const [pointsUsedToday, setPointsUsedToday] = useState<boolean>(false);
   const [streak, setStreak] = useState<number>(0);
   const [multiplier, setMultiplier] = useState<number>(1);
   const [totalPoints, setTotalPoints] = useState<number>(0);
@@ -40,6 +43,8 @@ const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshT
     
     const loadData = async () => {
       setLoading(true);
+      // Notify parent component that loading started
+      if (onLoadingStateChange) onLoadingStateChange(true);
       setError(null);
       
       try {
@@ -119,9 +124,23 @@ const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshT
           setMultiplier(1.0);
         }
         
-        // Calculate NFT points
-        const { totalPoints: nftPoints } = await calculateNFTPoints(userAddress);
-        setPoints(nftPoints);
+        // Calculate NFT points - both eligible (unused) and total
+        const { totalPoints: eligibleNftPoints, eligibleNfts } = await calculateNFTPoints(userAddress);
+        setEligiblePoints(eligibleNftPoints);
+        
+        // Now calculate total points from all NFTs regardless of usage
+        const { data: allNfts, error: allNftsError } = await supabase
+          .from('nfts')
+          .select('bonus_points')
+          .eq('wallet_address', userAddress.toLowerCase());
+          
+        if (allNftsError) throw allNftsError;
+        
+        const allNftsTotal = allNfts.reduce((sum, nft) => sum + (nft.bonus_points || 0), 0);
+        setTotalBonusPoints(allNftsTotal);
+        
+        // Determine if all points are used today
+        setPointsUsedToday(allNftsTotal > 0 && eligibleNftPoints === 0);
         
       } catch (err: any) {
         console.error('Error loading NFT data:', err);
@@ -134,11 +153,13 @@ const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshT
         }
       } finally {
         setLoading(false);
+        // Notify parent component that loading finished
+        if (onLoadingStateChange) onLoadingStateChange(false);
       }
     };
     
     loadData();
-  }, [provider, userAddress, refreshTrigger]);
+  }, [provider, userAddress, refreshTrigger, onLoadingStateChange]);
   
   // Handle responsive sizing for carousel - maximum 4 on desktop as requested
   useEffect(() => {
@@ -215,8 +236,15 @@ const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshT
   
   // Effect to setup observer when nfts change
   useEffect(() => {
-    // Reset loaded images when nfts change
-    setLoadedImages(new Set());
+    // Reset loaded images when nfts change but preload first itemsPerView images
+    const initialLoadedImages = new Set<number>();
+    
+    // Preload the first itemsPerView images (the ones visible initially)
+    for (let i = 0; i < Math.min(itemsPerView, nfts.length); i++) {
+      initialLoadedImages.add(i);
+    }
+    
+    setLoadedImages(initialLoadedImages);
     
     // Clear existing image refs
     imageRefs.current = new Map();
@@ -232,7 +260,7 @@ const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshT
         observerRef.current.disconnect();
       }
     };
-  }, [nfts, setupImageObserver]);
+  }, [nfts, setupImageObserver, itemsPerView]);
   
   // Navigation handlers with observer reset
   const goToPrevSlide = () => {
@@ -268,8 +296,26 @@ const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshT
     return nfts.slice(currentSlide, currentSlide + itemsPerView);
   };
   
-  // Calculate potential daily points
-  const dailyPointsPotential = points * multiplier;
+  // Calculate potential daily points using totalBonusPoints instead of eligiblePoints
+  const dailyPointsPotential = totalBonusPoints * multiplier;
+  
+  // Function to determine the style for each rarity type
+  const getRarityStyle = (rarity: string) => {
+    switch(rarity.toLowerCase()) {
+      case 'original':
+        return 'bg-[#C50045]';
+      case 'original z':
+        return 'bg-[#EA0354]';
+      case 'shiny':
+        return 'bg-gradient-to-r from-[#00E9FF] via-[#AD4DFF] to-[#FF7CFF]';
+      case 'shiny z':
+        return 'bg-gradient-to-r from-[#00E9FF] via-[#AD4DFF] via-[#FF7CFF] to-[#FF6265]';
+      case 'unique':
+        return 'bg-gradient-to-r from-[#FFC800] to-[#FF4B4B]';
+      default:
+        return 'bg-gray-500';
+    }
+  };
   
   if (!provider || !userAddress) {
     return <div className="p-6 bg-gray-100 rounded-lg">Connect your wallet to view NFTs</div>;
@@ -279,14 +325,6 @@ const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshT
     <div className="bg-gray-800 rounded-lg shadow-md p-6 mt-8 text-white">
       
       <h2 className="text-2xl font-bold mb-4 uppercase">Bonus rewards</h2> 
-      {loading && <div className="text-center py-4">Loading your bonus rewards...</div>}
-      
-      {syncingNFTs && (
-        <div className="bg-blue-100 text-blue-700 p-4 rounded-md mb-4">
-          <p className="font-semibold">Synchronizing NFTs with blockchain...</p>
-          <p className="text-sm">This ensures your bonus points are up to date if you've recently transferred NFTs.</p>
-        </div>
-      )}
       
       {error && (
         <div className="bg-red-100 text-red-700 p-4 rounded-md mb-4">
@@ -294,42 +332,44 @@ const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshT
         </div>
       )}
       
-        
       <div className="flex flex-col gap-4 mb-6">
-  <div className="grid grid-cols-2 gap-4">
-    <div className="bg-gray-700 p-4 rounded-md">
-      <div className="flex items-center">
-        <img 
-          src="/images/bonus_primos.png" 
-          alt="Primos Bonus" 
-          className="h-12 w-12 mr-3" 
-        />
-        <div>
-          <h3 className="font-bold text-lg text-white">Total Primos Bonus</h3>
-          <p className="text-2xl font-bold text-white">+{points}</p>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-gray-700 p-4 rounded-md">
+            <div className="flex items-center">
+              <img 
+                src="/images/bonus_primos.png" 
+                alt="Primos Bonus" 
+                className="h-12 w-12 mr-3" 
+              />
+              <div className="flex-1">
+                <h3 className="font-bold text-lg text-white">Total Primos Bonus</h3>
+                <p className="text-2xl font-bold text-white">+{totalBonusPoints}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-700 p-4 rounded-md">
+            <div className="flex items-center">
+              <img 
+                src="/images/bous_multiplier.png" 
+                alt="Multiplier Bonus" 
+                className="h-12 w-12 mr-3" 
+              />
+              <div>
+                <h3 className="font-bold text-lg text-white">Streak Multiplier Bonus</h3>
+                <p className="text-2xl font-bold text-white">x{multiplier}</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
-    <div className="bg-gray-700 p-4 rounded-md">
-      <div className="flex items-center">
-        <img 
-          src="/images/bous_multiplier.png" 
-          alt="Multiplier Bonus" 
-          className="h-12 w-12 mr-3" 
-        />
-        <div>
-          <h3 className="font-bold text-lg text-white">Streak Multiplier Bonus</h3>
-          <p className="text-2xl font-bold text-white">x{multiplier}</p>
-        </div>
-      </div>
-    </div>
-  </div>
-  
-</div>
       
 <h3 className="text-xl font-bold mt-6 mb-4 uppercase">Your Primos</h3>
       
-      {nfts.length === 0 && !loading ? (
+      {loading ? (
+        <div className="flex justify-center items-center py-20">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+      ) : nfts.length === 0 ? (
         <div 
           className="text-center py-12 rounded-md flex items-center justify-center" 
           style={{
@@ -376,7 +416,7 @@ const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshT
                     <div className="rounded-lg overflow-hidden bg-gray-700 h-full">
                       {nft.metadata?.image && (
                         <div 
-                          className="h-40 flex items-center justify-center relative"
+                          className="h-40 flex items-center justify-center relative overflow-hidden"
                           ref={(el) => setImageRef(el, index)}
                           data-nft-index={index}
                         >
@@ -384,8 +424,8 @@ const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshT
                             <img 
                               src={nft.metadata.image} 
                               alt={nft.metadata.name || `NFT #${nft.tokenId}`}
-                              className={`max-h-full max-w-full object-contain ${nft.isUsedToday ? 'opacity-50' : ''}`}
-                              loading="lazy"
+                              className={`w-full h-full object-cover ${nft.isUsedToday ? 'opacity-50' : ''}`}
+                              loading={index < itemsPerView ? "eager" : "lazy"}
                               onError={(e) => {
                                 e.currentTarget.src = '/placeholder-nft.png'; // Fallback image
                               }}
@@ -408,18 +448,24 @@ const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshT
                       )}
                       <div className="p-4 text-white">
                         <h4 className="font-bold">{nft.metadata?.name || `NFT #${nft.tokenId}`}</h4>
-                        <p className="text-sm text-gray-300">Rarity: {nft.rarity || 'Unknown'}</p>
                         <p className="text-sm text-gray-300">Bonus: +{nft.bonusPoints}</p>
                         {nft.isUsedToday ? (
                           <p className="text-xs text-red-400 mt-1">Available tomorrow</p>
                         ) : (
                           <p className="text-xs text-green-400 mt-1">Available now</p>
                         )}
-                        {nft.isFullSet && (
-                          <span className="inline-block mt-2 px-2 py-1 bg-blue-700 text-white text-xs font-semibold rounded">
-                            Full Set
-                          </span>
-                        )}
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {nft.rarity && (
+                            <span className={`inline-block px-1 py-0.5 text-white text-xs font-bold rounded uppercase ${getRarityStyle(nft.rarity)}`}>
+                              {nft.rarity}
+                            </span>
+                          )}
+                          {nft.isFullSet && (
+                            <span className="inline-block px-1 py-0.5 bg-[#36B57C] text-white text-xs font-bold rounded uppercase">
+                              Full Set
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>

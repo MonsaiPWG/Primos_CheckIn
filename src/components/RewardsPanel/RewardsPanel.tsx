@@ -246,10 +246,8 @@ const RewardsPanel: React.FC<RewardsPanelProps> = ({
         throw new Error(fullErrorMessage);
       }
       
-      // Actualizar el leaderboard - relación 1:1 (1 punto = 1 token)
-      if (userAddress) {
-        await updateLeaderboardTokensClaimed(userAddress, totalPoints);
-      }
+      // La actualización del leaderboard ya se realiza en el endpoint claim-tokens,
+      // elimino la actualización duplicada desde aquí para evitar contar doble los tokens
       
       // Actualizar el balance local de tokens
       const newTokenBalance = (parseInt(tokenBalance) + totalPoints).toString();
@@ -345,6 +343,7 @@ const RewardsPanel: React.FC<RewardsPanelProps> = ({
               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
               : 'bg-blue-600 text-white hover:bg-blue-700'
           }`}
+          title="Claim your rewards at any time!"
         >
           {loading ? 'Processing...' : 'Claim'}
         </button>
