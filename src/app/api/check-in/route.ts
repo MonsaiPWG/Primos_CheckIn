@@ -41,14 +41,31 @@ export async function POST(req: NextRequest) {
       const lastCheckIn = new Date(user.last_check_in);
       const now = new Date();
       
-      // Convertir ambas fechas a UTC para comparación consistente
-      const lastCheckInUTC = new Date(user.last_check_in);
-      const nowUTC = new Date();
+      // Normalizar correctamente ambas fechas a medianoche UTC para comparación consistente
+      const lastCheckInDate = new Date(user.last_check_in);
+      // Crear fecha UTC normalizada a medianoche (00:00:00.000)
+      const lastCheckInUTC = new Date(Date.UTC(
+        lastCheckInDate.getUTCFullYear(),
+        lastCheckInDate.getUTCMonth(),
+        lastCheckInDate.getUTCDate(),
+        0, 0, 0, 0
+      ));
       
-      // Comparar el día UTC para determinar si ya hizo check-in hoy
-      if (lastCheckInUTC.getUTCDate() === nowUTC.getUTCDate() && 
-          lastCheckInUTC.getUTCMonth() === nowUTC.getUTCMonth() && 
-          lastCheckInUTC.getUTCFullYear() === nowUTC.getUTCFullYear()) {
+      const nowDate = new Date();
+      // Crear fecha actual UTC normalizada a medianoche (00:00:00.000)
+      const nowUTC = new Date(Date.UTC(
+        nowDate.getUTCFullYear(),
+        nowDate.getUTCMonth(),
+        nowDate.getUTCDate(),
+        0, 0, 0, 0
+      ));
+      
+      console.log('DEBUG UTC Reset - Last check-in timestamp (UTC):', lastCheckInUTC.toISOString());
+      console.log('DEBUG UTC Reset - Current date timestamp (UTC):', nowUTC.toISOString());
+      console.log('DEBUG UTC Reset - Same UTC day?', lastCheckInUTC.getTime() === nowUTC.getTime());
+      
+      // Comparar los timestamps directamente para mayor precisión
+      if (lastCheckInUTC.getTime() === nowUTC.getTime()) {
         return NextResponse.json({ 
           error: 'Already checked in today (UTC)',
           user

@@ -463,6 +463,24 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
       const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((difference % (1000 * 60)) / 1000);
       
+      // Log para debugging
+      if (hours === 23 && minutes >= 58) {
+        console.log('DEBUG UTC Reset - Casi medianoche UTC:', {
+          now: now.toISOString(),
+          nowUTC: new Date(Date.UTC(
+            now.getUTCFullYear(),
+            now.getUTCMonth(),
+            now.getUTCDate(),
+            now.getUTCHours(),
+            now.getUTCMinutes(),
+            now.getUTCSeconds()
+          )).toISOString(),
+          nextMidnight: tomorrow.toISOString(),
+          difference,
+          hours, minutes, seconds
+        });
+      }
+      
       return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     };
 

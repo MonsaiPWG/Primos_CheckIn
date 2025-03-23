@@ -24,15 +24,30 @@ export async function GET(req: NextRequest) {
       
     // If we have data, add UTC check-in status
     if (data && data.last_check_in) {
-      const lastCheckInUTC = new Date(data.last_check_in);
-      const nowUTC = new Date();
+      // Normalizar correctamente ambas fechas a medianoche UTC
+      const lastCheckInDate = new Date(data.last_check_in);
+      // Crear fecha UTC normalizada a medianoche (00:00:00.000)
+      const lastCheckInUTC = new Date(Date.UTC(
+        lastCheckInDate.getUTCFullYear(),
+        lastCheckInDate.getUTCMonth(),
+        lastCheckInDate.getUTCDate(),
+        0, 0, 0, 0
+      ));
       
-      // Check if user has already checked in today (UTC)
-      data.checked_in_today_utc = (
-        lastCheckInUTC.getUTCDate() === nowUTC.getUTCDate() && 
-        lastCheckInUTC.getUTCMonth() === nowUTC.getUTCMonth() && 
-        lastCheckInUTC.getUTCFullYear() === nowUTC.getUTCFullYear()
-      );
+      const nowDate = new Date();
+      // Crear fecha actual UTC normalizada a medianoche (00:00:00.000)
+      const nowUTC = new Date(Date.UTC(
+        nowDate.getUTCFullYear(),
+        nowDate.getUTCMonth(),
+        nowDate.getUTCDate(),
+        0, 0, 0, 0
+      ));
+      
+      console.log('DEBUG UTC Reset - User-Data API - Last check-in timestamp (UTC):', lastCheckInUTC.toISOString());
+      console.log('DEBUG UTC Reset - User-Data API - Current date timestamp (UTC):', nowUTC.toISOString());
+      
+      // Comparar los timestamps directamente para mayor precisión
+      data.checked_in_today_utc = (lastCheckInUTC.getTime() === nowUTC.getTime());
       
       // Calculate hours remaining until 24 hours have passed
       const timeDiff = Math.abs(nowUTC.getTime() - lastCheckInUTC.getTime());
