@@ -14,25 +14,27 @@ const HowRewardsWorks: React.FC = () => {
       <p className="text-sm mt-2">Your Primos provide bonuses based on their rarity. By maintaining daily streaks, you'll unlock increasingly powerful multipliers.</p>
       <p className="text-sm font-semibold">NFTs Bonus x Streak Multiplier = Fire Dust Rewards</p>
       
-      <div className="mt-3 p-3 bg-blue-900 text-white rounded-md">
-        <h4 className="text-md font-bold flex items-center">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          Daily Reset Time
-        </h4>
-        <p className="text-sm mt-1">
-          Primos and check-ins reset at <span className="font-bold">00:00 UTC</span> each day.
-        </p>
-        <p className="text-sm mt-1">
-          Current UTC time: <span className="font-bold">{formattedUTCTime} UTC</span>
-        </p>
-        <p className="text-xs mt-1 text-blue-200">
-          Once a new UTC day begins, you can check in again and use your Primos for new bonuses.
-        </p>
-      </div>
-      
       <div className="mt-4">
+        <details className="bg-gray-700 p-3 rounded-md mb-2 shadow-sm text-white">
+          <summary className="font-bold cursor-pointer flex justify-between items-center">
+            <span>Daily Reset Time</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-chevron-down" viewBox="0 0 16 16">
+              <path fillRule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z" />
+            </svg>
+          </summary>
+          <div className="mt-2 p-2 bg-gray-600 rounded">
+            <p className="text-sm mt-1">
+              Primos and check-ins reset at <span className="font-bold">00:00 UTC</span> each day.
+            </p>
+            <p className="text-sm mt-1">
+              Current UTC time: <span className="font-bold">{formattedUTCTime} UTC</span>
+            </p>
+            <p className="text-sm mt-1">
+              Once a new UTC day begins, you can check in again and use your Primos for new bonuses.
+            </p>
+          </div>
+        </details>
+      
         <details className="bg-gray-700 p-3 rounded-md mb-2 shadow-sm text-white">
           <summary className="font-bold cursor-pointer flex justify-between items-center">
             <span>Primos Bonus</span>
