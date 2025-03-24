@@ -16,6 +16,7 @@ interface ContractInteractionProps {
 const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onCheckInSuccess, userAddress: externalUserAddress, nftCalculationInProgress, refreshTrigger }) => {
   const [streak, setStreak] = useState<number>(0);
   const [nextCheckInTime, setNextCheckInTime] = useState<string>('');
+  const [streakBroken, setStreakBroken] = useState<boolean>(false);
   // Añade esta función
   const updateLeaderboardStreak = async (walletAddress: string, currentStreak: number) => {
     try {
@@ -273,6 +274,19 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
                   const userData = await userResponse.json();
                   
                   if (userData.data) {
+                    // Check if streak is broken during initial load
+                    if (userData.data.streak_broken) {
+                      console.log("Streak broken detected during initial load");
+                      // Update URL to trigger streak broken notification in NFTDisplay
+                      const url = new URL(window.location.href);
+                      url.searchParams.set('check_in', 'true');
+                      url.searchParams.set('streak_broken', 'true');
+                      window.history.pushState({}, '', url.toString());
+                      
+                      // Set streakBroken state
+                      if (isMounted) setStreakBroken(true);
+                    }
+                    
                     if (userData.data.checked_in_today_utc === true) {
                       console.log("Usuario ya hizo check-in hoy (UTC) según la base de datos");
                       if (isMounted) setHasCheckedIn(true);
@@ -587,6 +601,18 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
               throw new Error(result.error || 'Failed to register check-in');
             }
             
+            // Check if streak was broken
+            const streakBroken = result.streakBroken;
+            
+            // If streak was broken, redirect with streakBroken parameter
+            if (streakBroken) {
+              // Update the URL with streakBroken and check_in parameters
+              const url = new URL(window.location.href);
+              url.searchParams.set('check_in', 'true');
+              url.searchParams.set('streak_broken', 'true');
+              window.history.pushState({}, '', url.toString());
+            }
+            
             // Actualizar la interfaz con la información de puntos
             setSuccess(`Successfully checked in! `);
             
@@ -776,6 +802,11 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
             <div>
               <h3 className="font-bold text-lg text-white">Current Streak</h3>
               <p className="text-2xl font-bold text-white">{streak} days</p>
+              {streak === 0 && (
+                <div className="mt-1 text-red-500 text-sm font-semibold">
+                  Streak lost! Remember to check in daily.
+                </div>
+              )}
             </div>
           </div>
         </div>

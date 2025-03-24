@@ -24,6 +24,7 @@ const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshT
   const [streak, setStreak] = useState<number>(0);
   const [multiplier, setMultiplier] = useState<number>(1);
   const [totalPoints, setTotalPoints] = useState<number>(0);
+  const [streakBroken, setStreakBroken] = useState<boolean>(false);
   
   // Simple carousel state
   const [currentSlide, setCurrentSlide] = useState<number>(0);
@@ -94,6 +95,15 @@ const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshT
         
         setNfts(nftsWithUsageStatus);
         
+        // Check if there's a check-in query parameter in the URL, which indicates a recent check-in
+        const urlParams = new URLSearchParams(window.location.search);
+        const recentCheckIn = urlParams.get('check_in') === 'true';
+        const streakBrokenParam = urlParams.get('streak_broken') === 'true';
+        
+        if (recentCheckIn && streakBrokenParam) {
+          setStreakBroken(true);
+        }
+        
         // Load user information using the API instead of direct Supabase access
         console.log('Fetching user data from API...');
         const userDataResponse = await fetch(`/api/user-data?wallet_address=${userAddress.toLowerCase()}`);
@@ -104,6 +114,12 @@ const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshT
         }
         
         const userData = userDataResult.data;
+        
+        // Also check if the user data indicates a streak break
+        if (userData && userData.streak_broken) {
+          console.log("Streak broken detected from API data");
+          setStreakBroken(true);
+        }
         
         if (userData) {
           setStreak(userData.current_streak || 0);
@@ -326,6 +342,14 @@ const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshT
       
       <h2 className="text-2xl font-bold mb-4 uppercase">Bonus rewards</h2> 
       
+      {streakBroken && (
+        <div className="bg-red-100 text-red-700 p-4 rounded-md mb-4 border-l-4 border-red-500">
+          <p className="font-bold">Streak Lost!</p>
+          <p>You have lost your daily check-in streak. Your streak has been reset to 0.</p>
+          <p className="text-sm mt-1">Remember to check in every day to maintain your streak and earn better multipliers.</p>
+        </div>
+      )}
+      
       {error && (
         <div className="bg-red-100 text-red-700 p-4 rounded-md mb-4">
           {error}
@@ -371,7 +395,7 @@ const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshT
         </div>
       ) : nfts.length === 0 ? (
         <div 
-          className="text-center py-12 rounded-md flex items-center justify-center" 
+          className="text-center py-12 rounded-md flex items-center justify-center mb-8" 
           style={{
             backgroundImage: 'url(/images/primo_estatua.jpg)',
             backgroundSize: 'cover',

@@ -49,10 +49,35 @@ export async function GET(req: NextRequest) {
       // Comparar los timestamps directamente para mayor precisión
       data.checked_in_today_utc = (lastCheckInUTC.getTime() === nowUTC.getTime());
       
-      // Calculate hours remaining until 24 hours have passed
+      // Calculate the difference in days
       const timeDiff = Math.abs(nowUTC.getTime() - lastCheckInUTC.getTime());
+      const daysDiff = Math.floor(timeDiff / (1000 * 3600 * 24));
       const hoursDiff = timeDiff / (1000 * 3600);
+      
       data.hours_since_last_checkin = hoursDiff;
+      data.days_since_last_checkin = daysDiff;
+      
+      // Check if more than one day has passed (streak broken)
+      if (daysDiff > 1 && data.current_streak > 0) {
+        // If streak should be broken and we're displaying stale data
+        console.log('Streak should be reset - days since last check-in:', daysDiff);
+        
+        // Reset streak to 0 in real-time
+        data.current_streak = 0;
+        data.streak_broken = true;
+        
+        // Also update the database to make sure it's correct for next time
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({
+            current_streak: 0
+          })
+          .eq('wallet_address', walletAddress.toLowerCase());
+          
+        if (updateError) {
+          console.error('Error updating broken streak:', updateError);
+        }
+      }
       
       if (hoursDiff < 24) {
         data.can_checkin = false;

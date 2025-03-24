@@ -20,6 +20,10 @@ export async function POST(req: NextRequest) {
       .eq('wallet_address', wallet_address.toLowerCase())
       .single();
     
+    // Variable para detectar si se rompió la racha
+    let streakBroken = false;
+    let daysDiff = 0;
+    
     // Si no existe, crearlo
     if (!user) {
       const { data: newUser, error: createError } = await supabase
@@ -77,8 +81,11 @@ export async function POST(req: NextRequest) {
       const daysDiff = Math.floor(timeDiff / (1000 * 3600 * 24));
       
       // Si es el día siguiente, incrementar streak
-      // Si hay más de un día de diferencia, reiniciar el streak
-      const newStreak = daysDiff === 1 ? user.current_streak + 1 : 1;
+      // Si hay más de un día de diferencia, reiniciar el streak a 0
+      const newStreak = daysDiff === 1 ? user.current_streak + 1 : 0;
+      
+      // Flag para indicar si se rompió la racha
+      streakBroken = daysDiff > 1;
       
       const { data: updatedUser, error: updateError } = await supabase
         .from('users')
@@ -197,7 +204,8 @@ export async function POST(req: NextRequest) {
       },
       check_in: checkIn,
       points_earned: pointsEarned,
-      multiplier
+      multiplier,
+      streakBroken
     });
     
   } catch (error) {
