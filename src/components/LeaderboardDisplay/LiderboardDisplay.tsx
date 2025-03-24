@@ -112,7 +112,6 @@ const LeaderboardDisplay = () => {
             entry.user_name || `${entry.wallet_address.substring(0, 6)}...${entry.wallet_address.substring(entry.wallet_address.length - 4)}`
           )}
         </td>
-        <td className="py-3 px-4 text-right">{entry.best_streak}</td>
         <td className="py-3 px-4 text-right">{entry.nft_count}</td>
         <td className="py-3 px-4 text-right font-medium">{entry.tokens_claimed.toLocaleString()}</td>
       </tr>
@@ -140,7 +139,6 @@ const LeaderboardDisplay = () => {
               <tr className="bg-gray-600 border-b border-gray-500">
                 <th className="py-3 px-4 text-left">Rank</th>
                 <th className="py-3 px-4 text-left">User</th>
-                <th className="py-3 px-4 text-right">Best Streak</th>
                 <th className="py-3 px-4 text-right">Total Primos</th>
                 <th className="py-3 px-4 text-right">Claimed Tokens</th>
               </tr>
@@ -158,7 +156,7 @@ const LeaderboardDisplay = () => {
                   {/* Add a separator row if there's data */}
                   {leaderboardData.length > 0 && (
                     <tr className="border-b border-gray-500">
-                      <td colSpan={5} className="py-2 text-center text-gray-400 bg-gray-700">
+                      <td colSpan={4} className="py-2 text-center text-gray-400 bg-gray-700">
                         <div className="flex items-center justify-center">
                           <div className="border-t border-dashed border-gray-500 flex-grow mx-4"></div>
                           <span>Your Position</span>
@@ -173,7 +171,7 @@ const LeaderboardDisplay = () => {
               
               {leaderboardData.length === 0 && !userEntry && (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-gray-400">
+                  <td colSpan={4} className="py-8 text-center text-gray-400">
                     No data available yet. Be the first to claim reward tokens!
                   </td>
                 </tr>
