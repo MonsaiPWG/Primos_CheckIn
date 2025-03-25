@@ -348,13 +348,6 @@ const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshT
       
       <h2 className="text-2xl font-bold mb-4 uppercase">Bonus rewards</h2> 
       
-      {streakBroken && (
-        <div className="bg-red-100 text-red-700 p-4 rounded-md mb-4 border-l-4 border-red-500">
-          <p className="font-bold">Streak Lost!</p>
-          <p>You have lost your daily check-in streak. Your streak has been reset to 0.</p>
-          <p className="text-sm mt-1">Remember to check in every day to maintain your streak and earn better multipliers.</p>
-        </div>
-      )}
       
       {error && (
         <div className="bg-red-100 text-red-700 p-4 rounded-md mb-4">
