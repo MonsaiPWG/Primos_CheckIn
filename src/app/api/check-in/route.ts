@@ -81,11 +81,21 @@ export async function POST(req: NextRequest) {
       const daysDiff = Math.floor(timeDiff / (1000 * 3600 * 24));
       
       // Si es el día siguiente, incrementar streak
-      // Si hay más de un día de diferencia, reiniciar el streak a 0
-      const newStreak = daysDiff === 1 ? user.current_streak + 1 : 0;
-      
-      // Flag para indicar si se rompió la racha
-      streakBroken = daysDiff > 1;
+      // Si hay más de un día de diferencia, reiniciar el streak a 1 cuando se hace check-in
+      // porque estamos empezando una nueva racha
+      let newStreak;
+      if (daysDiff === 1) {
+        // Día consecutivo, incrementamos la racha actual
+        newStreak = user.current_streak + 1;
+      } else if (daysDiff > 1) {
+        // Más de un día de diferencia, iniciamos una nueva racha con valor 1
+        newStreak = 1;
+        // Flag para indicar que se rompió la racha anterior
+        streakBroken = true;
+      } else {
+        // Este caso no debería ocurrir normalmente (mismo día)
+        newStreak = user.current_streak;
+      }
       
       const { data: updatedUser, error: updateError } = await supabase
         .from('users')

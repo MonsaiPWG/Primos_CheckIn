@@ -275,7 +275,8 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
                   
                   if (userData.data) {
                     // Check if streak is broken during initial load
-                    if (userData.data.streak_broken) {
+                    // Only show streak broken message if streak is still 0
+                    if (userData.data.streak_broken && userData.data.current_streak === 0) {
                       console.log("Streak broken detected during initial load");
                       // Update URL to trigger streak broken notification in NFTDisplay
                       const url = new URL(window.location.href);
@@ -285,6 +286,9 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
                       
                       // Set streakBroken state
                       if (isMounted) setStreakBroken(true);
+                    } else if (userData.data.current_streak > 0) {
+                      // If streak is positive, clear the streakBroken flag
+                      if (isMounted) setStreakBroken(false);
                     }
                     
                     if (userData.data.checked_in_today_utc === true) {

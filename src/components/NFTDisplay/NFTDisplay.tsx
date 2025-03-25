@@ -116,9 +116,15 @@ const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshT
         const userData = userDataResult.data;
         
         // Also check if the user data indicates a streak break
-        if (userData && userData.streak_broken) {
-          console.log("Streak broken detected from API data");
-          setStreakBroken(true);
+        // but only show the message if the current streak is still 0
+        if (userData) {
+          if (userData.streak_broken && userData.current_streak === 0) {
+            console.log("Streak broken detected from API data");
+            setStreakBroken(true);
+          } else if (userData.current_streak > 0) {
+            // Clear the streak broken message if user has a streak > 0
+            setStreakBroken(false);
+          }
         }
         
         if (userData) {

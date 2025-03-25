@@ -77,6 +77,11 @@ export async function GET(req: NextRequest) {
         if (updateError) {
           console.error('Error updating broken streak:', updateError);
         }
+      } else {
+        // Ensure streak_broken is false if the streak is positive
+        if (data.current_streak > 0) {
+          data.streak_broken = false;
+        }
       }
       
       if (hoursDiff < 24) {
