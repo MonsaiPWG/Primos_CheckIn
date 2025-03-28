@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { useConnectorStore } from '@/hooks/useConnectorStore';
 import ContractInteraction from '@/components/ContractInteraction';
@@ -11,7 +11,6 @@ import RewardsPanel from '@/components/RewardsPanel/RewardsPanel';
 import LeaderboardDisplay from '@/components/LeaderboardDisplay/LiderboardDisplay';
 import HowRewardsWorks from '@/components/NFTDisplay/HowRewardsWorks';
 import { RONIN_CHAIN_IDS } from '@/utils/contract';
-import { supabase } from '@/utils/supabase';
 
 export default function Home() {
   const [provider, setProvider] = useState<ethers.providers.Web3Provider | null>(null);
@@ -65,8 +64,9 @@ export default function Home() {
     }
   };
 
+  // Memoizamos las funciones para evitar recreaciones innecesarias
   // Función para conectar wallet
-  const handleConnect = async (newProvider: ethers.providers.Web3Provider) => {
+  const handleConnect = useCallback(async (newProvider: ethers.providers.Web3Provider) => {
     setProvider(newProvider);
     
     // Obtener info de la red
@@ -83,23 +83,32 @@ export default function Home() {
       console.error("Error getting network info:", err);
       setNetworkName('Unknown Network');
     }
-  };
+  }, []);
 
   // Función para desconectar wallet
-  const handleDisconnect = () => {
+  const handleDisconnect = useCallback(() => {
     setProvider(null);
     setNetworkName('Not Connected');
     setUserAddress(null);
     setTotalPoints(0);
-  };
+  }, []);
+
+  // Memoizamos la función para actualizar datos
+  const handleDataRefresh = useCallback(() => {
+    setUserDataRefresh(prev => prev + 1);
+  }, []);
 
   // Cargar datos del usuario usando la API en lugar de acceso directo a Supabase
   useEffect(() => {
+    let isMounted = true;
+    
     if (!userAddress) return;
     
     const loadUserData = async () => {
       try {
         const response = await fetch(`/api/user-data?wallet_address=${userAddress.toLowerCase()}`);
+        if (!isMounted) return;
+        
         const result = await response.json();
         
         if (result.error) {
@@ -107,12 +116,14 @@ export default function Home() {
           return;
         }
         
-        if (result.data) {
+        if (result.data && isMounted) {
           setTotalPoints(result.data.total_points || 0);
-        } else {
+        } else if (isMounted) {
           setTotalPoints(0);
         }
       } catch (err) {
+        if (!isMounted) return;
+        
         console.error('Error in user data fetch:', err);
         if (err instanceof Error) {
           console.error('Error details:', err.message);
@@ -123,12 +134,11 @@ export default function Home() {
     };
     
     loadUserData();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [userAddress, userDataRefresh]);
-
-  // Función para actualizar datos después de check-in o reclamo
-  const handleDataRefresh = () => {
-    setUserDataRefresh(prev => prev + 1);
-  };
 
   return (
     <div className="min-h-screen relative" style={{
