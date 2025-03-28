@@ -174,13 +174,13 @@ export default function EvolutionPage() {
                   Connect your Ronin Wallet to evolve your Primos
                 </h2>
                 
-                {/* Video con preview */}
+                {/* Video con preview - añadiendo control */}
                 <div className="w-full max-w-3xl mx-auto">
                   <video 
                     src="/videos/piedras_o.webm" 
                     autoPlay
                     loop
-                   
+                    controls
                     muted
                     playsInline
                     className="w-full rounded-lg"

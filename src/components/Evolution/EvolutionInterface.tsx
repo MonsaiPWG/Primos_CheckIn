@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { Web3Provider } from '@ethersproject/providers';
-import Image from 'next/image';
 import {
   fetchEvolutionStones,
   startEvolutionProcess,
@@ -39,6 +38,28 @@ const EvolutionInterface: React.FC<EvolutionInterfaceProps> = ({ provider, userA
   const [completedEvolutions, setCompletedEvolutions] = useState<EvolutionProcess[]>([]);
   const [countdowns, setCountdowns] = useState<{ [key: string]: string }>({});
 
+  // Obtener la rareza del Primo (desde la propiedad o desde los atributos)
+  const getPrimoRarity = useCallback((primo: PrimoNFT): string => {
+    // Si la rareza está definida directamente, usarla
+    if (primo.rarity) {
+      return primo.rarity.toLowerCase();
+    }
+    
+    // Si no, intentar extraerla de los atributos
+    if (primo.metadata?.attributes) {
+      const rarityAttr = primo.metadata.attributes.find(
+        (attr: any) => attr.trait_type === 'Rarity'
+      );
+      
+      if (rarityAttr) {
+        return rarityAttr.value.toLowerCase();
+      }
+    }
+    
+    // Si llegamos aquí, no pudimos determinar la rareza
+    return '';
+  }, []);
+  
   // Cargar NFTs y piedras al iniciar
   useEffect(() => {
     if (!provider || !userAddress) return;
@@ -75,31 +96,8 @@ const EvolutionInterface: React.FC<EvolutionInterfaceProps> = ({ provider, userA
     loadUserAssets();
   }, [provider, userAddress]);
   
-  // Obtener la rareza del Primo (desde la propiedad o desde los atributos)
-  const getPrimoRarity = (primo: PrimoNFT): string => {
-    // Si la rareza está definida directamente, usarla
-    if (primo.rarity) {
-      return primo.rarity.toLowerCase();
-    }
-    
-    // Si no, intentar extraerla de los atributos
-    if (primo.metadata?.attributes) {
-      const rarityAttr = primo.metadata.attributes.find(
-        (attr: any) => attr.trait_type === 'Rarity'
-      );
-      
-      if (rarityAttr) {
-        return rarityAttr.value.toLowerCase();
-      }
-    }
-    
-    // Si llegamos aquí, no pudimos determinar la rareza
-    console.error('No se pudo determinar la rareza del Primo:', primo);
-    return '';
-  };
-  
   // Verificar compatibilidad entre Primo y piedra
-  const isPrimoAndStoneCompatible = (): boolean => {
+  const isPrimoAndStoneCompatible = useCallback((): boolean => {
     if (!selectedPrimo || !selectedStone) return false;
     
     const stoneConfig = EVOLUTION_STONES[selectedStone.type];
@@ -107,14 +105,11 @@ const EvolutionInterface: React.FC<EvolutionInterfaceProps> = ({ provider, userA
     
     // Si no pudimos determinar la rareza, no es compatible
     if (!primoRarity) {
-      console.error('Rareza no encontrada en el Primo:', selectedPrimo);
       return false;
     }
     
-    // Eliminamos el console.log que generaba muchas solicitudes
-    
     return stoneConfig.compatibleWith.includes(primoRarity);
-  };
+  }, [selectedPrimo, selectedStone, getPrimoRarity]);
   
   // Obtener piedras compatibles para el Primo seleccionado usando useMemo para evitar recálculos innecesarios
   const compatibleStones = useMemo((): EvolutionStone[] => {
@@ -125,25 +120,20 @@ const EvolutionInterface: React.FC<EvolutionInterfaceProps> = ({ provider, userA
     
     // Si no pudimos determinar la rareza, mostrar error y retornar array vacío
     if (!primoRarity) {
-      console.error('Rareza no encontrada en el Primo seleccionado:', selectedPrimo);
       return [];
     }
-    
-    // Eliminamos logs excesivos
     
     return evolutionStones.filter(stone => {
       const stoneConfig = EVOLUTION_STONES[stone.type];
       const isCompatible = stoneConfig.compatibleWith.includes(primoRarity);
       const hasBalance = stone.balance > 0;
       
-      // Eliminamos logs excesivos
-      
       return isCompatible && hasBalance;
     });
-  }, [selectedPrimo, evolutionStones]); // Solo recalcular cuando cambie el Primo seleccionado o las piedras
+  }, [selectedPrimo, evolutionStones, getPrimoRarity]); // Solo recalcular cuando cambie el Primo seleccionado o las piedras
   
   // Iniciar proceso de evolución
-  const startEvolution = async () => {
+  const startEvolution = useCallback(async () => {
     if (!provider || !userAddress || !selectedPrimo || !selectedStone) {
       setError('Please select both a Primo and a compatible Evolution Stone.');
       return;
@@ -159,25 +149,6 @@ const EvolutionInterface: React.FC<EvolutionInterfaceProps> = ({ provider, userA
     setError(null);
     
     try {
-      // Log detallado del Primo seleccionado
-      console.log('Primo seleccionado completo:', selectedPrimo);
-      console.log('Metadata del Primo:', selectedPrimo.metadata);
-      
-      if (selectedPrimo.metadata?.attributes) {
-        // Buscar el atributo de rareza en los attributes
-        const rarityAttr = selectedPrimo.metadata.attributes.find(
-          (attr: any) => attr.trait_type === 'Rarity'
-        );
-        console.log('Atributo de rareza encontrado en metadata:', rarityAttr);
-      }
-      
-      console.log('Iniciando evolución con:', {
-        tokenId: selectedPrimo.tokenId,
-        stoneType: selectedStone.type,
-        primoRarity: selectedPrimo.rarity,
-        isRarityDefined: selectedPrimo.rarity !== undefined
-      });
-      
       // Preparar los metadatos con la información de rareza
       // Primero obtenemos la rareza de los atributos si está disponible
       let rarityFromAttributes = '';
@@ -188,13 +159,11 @@ const EvolutionInterface: React.FC<EvolutionInterfaceProps> = ({ provider, userA
         );
         if (rarityAttr) {
           rarityFromAttributes = rarityAttr.value;
-          console.log('Rareza encontrada en atributos:', rarityFromAttributes);
         }
       }
       
       // Usar la rareza de los atributos si la propiedad rarity no está definida
       const effectiveRarity = selectedPrimo.rarity || rarityFromAttributes;
-      console.log('Rareza efectiva a usar:', effectiveRarity);
       
       // Iniciar proceso de evolución con metadatos enriquecidos
       await startEvolutionProcess(
@@ -232,10 +201,10 @@ const EvolutionInterface: React.FC<EvolutionInterfaceProps> = ({ provider, userA
     } finally {
       setLoading(false);
     }
-  };
+  }, [provider, userAddress, selectedPrimo, selectedStone, isPrimoAndStoneCompatible]);
   
   // Función para calcular el tiempo restante para la evolución
-  const calculateTimeRemaining = (estimatedCompletionDate: string | undefined): string => {
+  const calculateTimeRemaining = useCallback((estimatedCompletionDate: string | undefined): string => {
     if (!estimatedCompletionDate) return 'Unknown';
     
     const now = new Date();
@@ -255,15 +224,7 @@ const EvolutionInterface: React.FC<EvolutionInterfaceProps> = ({ provider, userA
     const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
     
     return `${hours}h ${minutes}m ${seconds}s`;
-  };
-  
-  // Formatear fecha para mostrar
-  const formatDate = (dateString: string | undefined): string => {
-    if (!dateString) return 'N/A';
-    
-    const date = new Date(dateString);
-    return date.toLocaleString();
-  };
+  }, []);
   
   // Efecto para actualizar los countdowns cada segundo
   useEffect(() => {
@@ -292,7 +253,7 @@ const EvolutionInterface: React.FC<EvolutionInterfaceProps> = ({ provider, userA
     
     // Clean up interval on unmount
     return () => clearInterval(intervalId);
-  }, [completedEvolutions]);
+  }, [completedEvolutions, calculateTimeRemaining]);
   
   // Renderizar estado de la evolución
   const renderEvolutionStatus = (status: string): JSX.Element => {
