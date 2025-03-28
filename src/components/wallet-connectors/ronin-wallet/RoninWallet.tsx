@@ -114,9 +114,8 @@ const RoninWallet: FC<RoninWalletProps> = ({ onConnect, onDisconnect }) => {
 
   useEffect(() => {
     let mounted = true;
-    
-    setIsConnected(false);
-    
+    // No reiniciamos la conexión cada vez que se monta el componente
+    // para permitir mantener la conexión entre navegaciones
     const setupConnector = async () => {
       try {
         const roninConnector = await requestRoninWalletConnector();
@@ -124,6 +123,26 @@ const RoninWallet: FC<RoninWalletProps> = ({ onConnect, onDisconnect }) => {
         if (!mounted) return;
         
         setConnector(roninConnector);
+        
+        // If we already have an account in the store, attempt to reconnect automatically
+        if (account && !isConnected) {
+          try {
+            console.log('Attempting to restore existing wallet connection');
+            const providerInstance = await roninConnector.getProvider();
+            
+            if (providerInstance) {
+              setIsConnected(true);
+              
+              if (onConnect) {
+                const provider = new ethers.providers.Web3Provider(providerInstance as any);
+                onConnect(provider);
+              }
+            }
+          } catch (err) {
+            console.error('Failed to restore wallet connection:', err);
+            setIsConnected(false);
+          }
+        }
         
         // Setup event listeners with proper function references that we can later remove
         const connectListener = (payload: IConnectResult) => onConnectHandler(payload);
@@ -194,12 +213,12 @@ const RoninWallet: FC<RoninWalletProps> = ({ onConnect, onDisconnect }) => {
   }, []);
 
   return (
-    <div className={'flex flex-col justify-center'}>
+    <div className={'flex flex-col justify-center w-full md:w-auto'}>
       <WillRender when={!isConnected}>
         <button 
           onClick={connectWallet} 
           disabled={connecting}
-          className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 disabled:bg-blue-300"
+          className="w-full md:w-auto px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 disabled:bg-blue-300"
         >
           {connecting ? 'Connecting...' : 'Connect Wallet'}
         </button>
@@ -212,13 +231,13 @@ const RoninWallet: FC<RoninWalletProps> = ({ onConnect, onDisconnect }) => {
       </WillRender>
       
       <WillRender when={isConnected}>
-        <div className="flex flex-row items-center justify-between gap-3">
-          <div className="text-sm font-medium px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded border border-gray-200 dark:border-gray-600">
+        <div className="w-full flex flex-col md:flex-row items-center md:justify-between gap-2 md:gap-3">
+          <div className="w-full md:w-auto text-sm font-medium px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded border border-gray-200 dark:border-gray-600 text-center md:text-left">
             {account ? `${account.substring(0, 6)}...${account.substring(account.length - 4)}` : 'Unknown'}
           </div>
           <button
             onClick={disconnectWallet}
-            className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700"
+            className="w-full md:w-auto px-4 py-2 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700"
           >
             Disconnect
           </button>

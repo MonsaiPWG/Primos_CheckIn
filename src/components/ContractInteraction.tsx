@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { ethers } from 'ethers';
 import { getContract, retry, safeNumberFromBN, safeStringFromBN, directContractCall, RONIN_CHAIN_IDS } from '@/utils/contract';
-import { createClient } from '@/utils/supabase/client';
+import { supabase } from '@/utils/supabase'; // Use the singleton instance
 
 interface ContractInteractionProps {
   provider: ethers.providers.Web3Provider | null;
@@ -17,10 +17,10 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
   const [streak, setStreak] = useState<number>(0);
   const [nextCheckInTime, setNextCheckInTime] = useState<string>('');
   const [streakBroken, setStreakBroken] = useState<boolean>(false);
-  // Añade esta función
+  // Función modificada para usar la instancia singleton de supabase
   const updateLeaderboardStreak = async (walletAddress: string, currentStreak: number) => {
     try {
-      const supabase = createClient();
+      // Usar la instancia singleton de supabase en lugar de crear una nueva
       
       // Primero obtener los datos existentes del leaderboard
       const { data: existingData, error: fetchError } = await supabase
@@ -575,12 +575,14 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
         console.log("Attempting to check in with user address:", userAddress);
         
         try {
-          // Usar directamente el userAddress que ya tenemos
-          // No intentamos obtener el signer address aquí para evitar el error
-          console.log("Proceeding with check-in for address:", userAddress);
+          // Obtener explícitamente la dirección del firmante antes de hacer el check-in
+          const signer = provider.getSigner();
+          const signerAddress = await signer.getAddress();
           
-          // Call checkIn function with user's address
-          const tx = await contract.checkIn(userAddress);
+          console.log("Proceeding with check-in for address:", signerAddress);
+          
+          // Call checkIn function with signer's address (always the connected wallet)
+          const tx = await contract.checkIn(signerAddress);
           
           console.log("Check-in transaction sent successfully, waiting for confirmation...");
           await tx.wait();
@@ -594,7 +596,7 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                wallet_address: userAddress,
+                wallet_address: signerAddress,
                 transaction_hash: tx.hash,
               }),
             });
@@ -620,10 +622,8 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
             // Actualizar la interfaz con la información de puntos
             setSuccess(`Successfully checked in! `);
             
-            // Actualizar el leaderboard si tenemos la dirección del usuario
-            if (userAddress) {
-              await updateLeaderboardStreak(userAddress, checkInCount);
-            }
+            // Actualizar el leaderboard con la dirección del firmante
+            await updateLeaderboardStreak(signerAddress, checkInCount);
             
             // Llamar al callback si existe
             if (onCheckInSuccess) {
@@ -679,9 +679,13 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
         
         try {
           try {
-          // Update last check-in time with retry
+          // Get the signer address again
+          const signer = provider.getSigner();
+          const signerAddress = await signer.getAddress();
+            
+          // Update last check-in time with retry using signerAddress
           const lastCheckInTime = await retry(async () => {
-            return await contract.getLastUpdatedPeriod(userAddress);
+            return await contract.getLastUpdatedPeriod(signerAddress);
           });
           
           // Get the current date for display purposes
@@ -703,9 +707,9 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
           const timeStr = now.toLocaleTimeString('en-US', timeOptions);
           setLastCheckIn(`${dateStr}\n${timeStr}`);
           
-          // Also refresh the check-in status
+          // Also refresh the check-in status using signerAddress
           const isCheckedIn = await retry(async () => {
-            return await contract.isCheckedInToday(userAddress);
+            return await contract.isCheckedInToday(signerAddress);
           });
           setHasCheckedIn(isCheckedIn);
           } catch (innerErr) {
@@ -724,9 +728,13 @@ const ContractInteraction: React.FC<ContractInteractionProps> = ({ provider, onC
         
         try {
           try {
-            // Update check-in count with retry
+            // Get the signer address once more for consistency
+            const signer = provider.getSigner();
+            const signerAddress = await signer.getAddress();
+            
+            // Update check-in count with retry using signerAddress
             const count = await retry(async () => {
-              return await contract.getCurrentStreak(userAddress);
+              return await contract.getCurrentStreak(signerAddress);
             });
             setCheckInCount(count.toNumber());
           } catch (innerErr) {

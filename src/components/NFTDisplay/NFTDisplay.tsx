@@ -64,36 +64,9 @@ const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshT
           }
         }
         
-        // Get NFTs already used today by ANY wallet
-        const today = new Date().toISOString().split('T')[0];
-        console.log("Checking nft_usage_tracking for date:", today);
-        const { data: usedNfts, error: usedError } = await supabase
-          .from('nft_usage_tracking')
-          .select('token_id, contract_address')
-          .eq('usage_date', today);
-        // Note: We no longer filter by wallet_address
-        
-        console.log("Used NFTs found:", usedNfts?.length || 0);
-        
-        if (usedError) throw usedError;
-        
-        // Create a set of used NFTs
-        const usedNftSet = new Set();
-        usedNfts?.forEach(nft => {
-          const key = `${nft.token_id}-${nft.contract_address}`;
-          usedNftSet.add(key);
-          console.log("Adding used NFT to set:", key);
-        });
-        
-        // Mark NFTs as used
-        const nftsWithUsageStatus = userNfts ? userNfts.map(nft => {
-          const key = `${nft.tokenId}-${PRIMOS_NFT_CONTRACT.toLowerCase()}`;
-          const isUsedToday = usedNftSet.has(key);
-          console.log(`NFT ID:${nft.tokenId}, Key:${key}, IsUsed:${isUsedToday}`);
-          return { ...nft, isUsedToday };
-        }) : [];
-        
-        setNfts(nftsWithUsageStatus);
+    // Establecer NFTs inicialmente
+    // No hacemos verificación inicial - lo haremos después con calculateNFTPoints
+    setNfts(userNfts || []);
         
         // Check if there's a check-in query parameter in the URL, which indicates a recent check-in
         const urlParams = new URLSearchParams(window.location.search);
@@ -147,13 +120,13 @@ const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshT
         }
         
         // Calculate NFT points - both eligible (unused) and total
-        const { totalPoints: eligibleNftPoints, eligibleNfts } = await calculateNFTPoints(userAddress);
+        const { totalPoints: eligibleNftPoints, eligibleNfts, success: nftPointsSuccess } = await calculateNFTPoints(userAddress);
         setEligiblePoints(eligibleNftPoints);
         
         // Now calculate total points from all NFTs regardless of usage
         const { data: allNfts, error: allNftsError } = await supabase
           .from('nfts')
-          .select('bonus_points')
+          .select('token_id, contract_address, bonus_points')
           .eq('wallet_address', userAddress.toLowerCase());
           
         if (allNftsError) throw allNftsError;
@@ -161,8 +134,31 @@ const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshT
         const allNftsTotal = allNfts.reduce((sum, nft) => sum + (nft.bonus_points || 0), 0);
         setTotalBonusPoints(allNftsTotal);
         
+        // Crear un mapa con los NFTs elegibles
+        const eligibleNftsMap = new Map();
+        eligibleNfts.forEach(nft => {
+          const key = `${nft.token_id}-${nft.contract_address}`.toLowerCase();
+          eligibleNftsMap.set(key, true);
+        });
+        
+        // Marcar los NFTs como usados o no usados
+        const nftsWithCorrectUsageStatus = userNfts ? userNfts.map(nft => {
+          const key = `${nft.tokenId}-${PRIMOS_NFT_CONTRACT.toLowerCase()}`.toLowerCase();
+          // Si el NFT no está en la lista de elegibles, se considera usado
+          const isEligible = eligibleNftsMap.has(key);
+          return { ...nft, isUsedToday: !isEligible };
+        }) : [];
+        
+        // Reemplazar la lista de NFTs con la versión actualizada
+        setNfts(nftsWithCorrectUsageStatus);
+        
         // Determine if all points are used today
         setPointsUsedToday(allNftsTotal > 0 && eligibleNftPoints === 0);
+        
+        // Log para debugging
+        const totalNfts = userNfts?.length || 0;
+        const totalUsados = Math.max(0, totalNfts - eligibleNfts.length);
+        console.log(`Estado final de elegibilidad de NFTs: Total=${totalNfts}, Elegibles=${eligibleNfts.length}, Usados=${totalUsados}`);
         
       } catch (err: any) {
         console.error('Error loading NFT data:', err);
@@ -194,7 +190,7 @@ const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshT
       } else if (width >= 640) { // sm
         setItemsPerView(2);
       } else {
-        setItemsPerView(1);
+        setItemsPerView(2); // Changed from 1 to 2 to show two items per view on mobile
       }
     };
     
@@ -356,7 +352,7 @@ const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshT
       )}
       
       <div className="flex flex-col gap-4 mb-6">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-gray-700 p-4 rounded-md">
             <div className="flex items-center">
               <img 
@@ -366,7 +362,10 @@ const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshT
               />
               <div className="flex-1">
                 <h3 className="font-bold text-lg text-white">Total Primos Bonus</h3>
-                <p className="text-2xl font-bold text-white">+{totalBonusPoints}</p>
+                <div className="flex items-baseline">
+                  <p className="text-2xl font-bold text-white">+{totalBonusPoints}</p>
+                  <p className="ml-2 text-sm text-white">(Available today: <span className="font-bold text-green-400">+{eligiblePoints}</span>)</p>
+                </div>
               </div>
             </div>
           </div>
@@ -462,20 +461,26 @@ const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshT
                           )}
                           {nft.isUsedToday && (
                             <div className="absolute inset-0 flex items-center justify-center">
-                              <span className="bg-red-500 text-white px-2 py-1 rounded text-sm font-bold">
-                                Used Today
-                              </span>
+                              <div className="bg-red-500 text-white px-4 py-2 rounded text-sm font-bold">
+                                BLOCKED
+                              </div>
                             </div>
                           )}
                         </div>
                       )}
                       <div className="p-4 text-white">
                         <h4 className="font-bold">{nft.metadata?.name || `NFT #${nft.tokenId}`}</h4>
-                        <p className="text-sm text-gray-300">Bonus: +{nft.bonusPoints}</p>
+                        <p className="text-sm text-gray-300">
+                          Bonus: {nft.isUsedToday ? (
+                            <span className="line-through text-red-400">+{nft.bonusPoints}</span>
+                          ) : (
+                            <span className="text-green-400">+{nft.bonusPoints}</span>
+                          )}
+                        </p>
                         {nft.isUsedToday ? (
-                          <p className="text-xs text-red-400 mt-1">Available at 00:00 UTC</p>
+                          <p className="text-xs text-red-400 mt-1 font-bold">Blocked until 00:00 UTC</p>
                         ) : (
-                          <p className="text-xs text-green-400 mt-1">Available now</p>
+                          <p className="text-xs text-green-400 mt-1 font-bold">Available now</p>
                         )}
                         <div className="flex flex-wrap gap-1 mt-2">
                           {nft.rarity && (
@@ -526,7 +531,7 @@ const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshT
           
           {/* NFT Count */}
           <div className="mt-2 text-center text-sm text-gray-400">
-            Total: {nfts.length} Primos
+            Total: {nfts.length} Primos ({eligiblePoints > 0 ? `${eligiblePoints} points available today` : 'All used today'})
           </div>
         </div>
       )}

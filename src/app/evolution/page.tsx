@@ -2,56 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
-import { useConnectorStore } from '@/hooks/useConnectorStore';
-import ContractInteraction from '@/components/ContractInteraction';
+import { Web3Provider } from '@ethersproject/providers';
 import RoninWallet from '@/components/wallet-connectors/ronin-wallet/RoninWallet';
 import Navigation from '@/components/Navigation';
-import NFTDisplay from '@/components/NFTDisplay/NFTDisplay';
-import RewardsPanel from '@/components/RewardsPanel/RewardsPanel';
-import LeaderboardDisplay from '@/components/LeaderboardDisplay/LiderboardDisplay';
-import HowRewardsWorks from '@/components/NFTDisplay/HowRewardsWorks';
+import EvolutionInterface from '@/components/Evolution/EvolutionInterface';
+import AboutEvolution from '@/components/Evolution/AboutEvolution';
+import { useConnectorStore } from '@/hooks/useConnectorStore';
 import { RONIN_CHAIN_IDS } from '@/utils/contract';
-import { supabase } from '@/utils/supabase';
 
-export default function Home() {
-  const [provider, setProvider] = useState<ethers.providers.Web3Provider | null>(null);
+export default function EvolutionPage() {
+  const [provider, setProvider] = useState<Web3Provider | null>(null);
   const [networkName, setNetworkName] = useState<string>('Not Connected');
   const [userAddress, setUserAddress] = useState<string | null>(null);
   const { account, connector, isConnected } = useConnectorStore();
-  const [totalPoints, setTotalPoints] = useState<number>(0);
-  const [userDataRefresh, setUserDataRefresh] = useState<number>(0);
-  const [nftCalculationInProgress, setNftCalculationInProgress] = useState<boolean>(false);
-
-  // Effect para verificar si ya hay una conexión activa en el store
-  useEffect(() => {
-    // Si hay una conexión activa y una cuenta en el store, pero no tenemos provider local
-    if (isConnected && account && !provider && connector) {
-      const initializeProvider = async () => {
-        try {
-          console.log('Mining Page: Restaurando provider desde el store');
-          const providerInstance = await connector.getProvider();
-          
-          if (providerInstance) {
-            const ethersProvider = new ethers.providers.Web3Provider(providerInstance as any);
-            
-            // Configurar el estado local con el provider restaurado
-            setProvider(ethersProvider);
-            
-            // Obtener info de la red
-            const network = await ethersProvider.getNetwork();
-            setNetworkName(getNetworkName(network.chainId));
-            
-            // Establecer la dirección de usuario desde el account del store
-            setUserAddress(account);
-          }
-        } catch (err) {
-          console.error('Error al restaurar provider en Mining Page:', err);
-        }
-      };
-      
-      initializeProvider();
-    }
-  }, [isConnected, account, provider, connector]);
 
   // Función para obtener el nombre de la red
   const getNetworkName = (chainId: number): string => {
@@ -65,8 +28,39 @@ export default function Home() {
     }
   };
 
+  // Effect para verificar si ya hay una conexión activa en el store
+  useEffect(() => {
+    // Si hay una conexión activa y una cuenta en el store, pero no tenemos provider local
+    if (isConnected && account && !provider && connector) {
+      const initializeProvider = async () => {
+        try {
+          console.log('Evolution Page: Restaurando provider desde el store');
+          const providerInstance = await connector.getProvider();
+          
+          if (providerInstance) {
+            const ethersProvider = new Web3Provider(providerInstance as any);
+            
+            // Configurar el estado local con el provider restaurado
+            setProvider(ethersProvider);
+            
+            // Obtener info de la red
+            const network = await ethersProvider.getNetwork();
+            setNetworkName(getNetworkName(network.chainId));
+            
+            // Establecer la dirección de usuario desde el account del store
+            setUserAddress(account);
+          }
+        } catch (err) {
+          console.error('Error al restaurar provider en Evolution Page:', err);
+        }
+      };
+      
+      initializeProvider();
+    }
+  }, [isConnected, account, provider, connector]);
+
   // Función para conectar wallet
-  const handleConnect = async (newProvider: ethers.providers.Web3Provider) => {
+  const handleConnect = async (newProvider: Web3Provider) => {
     setProvider(newProvider);
     
     // Obtener info de la red
@@ -90,49 +84,11 @@ export default function Home() {
     setProvider(null);
     setNetworkName('Not Connected');
     setUserAddress(null);
-    setTotalPoints(0);
-  };
-
-  // Cargar datos del usuario usando la API en lugar de acceso directo a Supabase
-  useEffect(() => {
-    if (!userAddress) return;
-    
-    const loadUserData = async () => {
-      try {
-        const response = await fetch(`/api/user-data?wallet_address=${userAddress.toLowerCase()}`);
-        const result = await response.json();
-        
-        if (result.error) {
-          console.error('Error loading user data:', result.error);
-          return;
-        }
-        
-        if (result.data) {
-          setTotalPoints(result.data.total_points || 0);
-        } else {
-          setTotalPoints(0);
-        }
-      } catch (err) {
-        console.error('Error in user data fetch:', err);
-        if (err instanceof Error) {
-          console.error('Error details:', err.message);
-        } else {
-          console.error('Unexpected error format:', JSON.stringify(err));
-        }
-      }
-    };
-    
-    loadUserData();
-  }, [userAddress, userDataRefresh]);
-
-  // Función para actualizar datos después de check-in o reclamo
-  const handleDataRefresh = () => {
-    setUserDataRefresh(prev => prev + 1);
   };
 
   return (
     <div className="min-h-screen relative" style={{
-      backgroundImage: "url('/images/fondomina_primos.jpeg')",
+      backgroundImage: "url('/images/altar_big.jpeg')",
       backgroundSize: "cover",
       backgroundPosition: "center",
       backgroundAttachment: "fixed"
@@ -166,10 +122,10 @@ export default function Home() {
                 />
                 <div>
                   <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white uppercase">
-                    Primos Daily Check-in
+                    Primos Evolution 
                   </h1>
                   <p className="text-xs sm:text-sm text-gray-400 mt-1">
-                    Earn rewards with daily check-ins
+                    Evolve your Primos with special EvoZtones
                   </p>
                 </div>
               </div>
@@ -198,38 +154,10 @@ export default function Home() {
         <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
             {provider ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="md:col-span-2">
-                  <ContractInteraction 
-                    provider={provider} 
-                    userAddress={userAddress}
-                    onCheckInSuccess={handleDataRefresh}
-                    nftCalculationInProgress={nftCalculationInProgress}
-                    refreshTrigger={userDataRefresh} // Add refreshTrigger prop
-                  />
-                  
-                  <NFTDisplay 
-                    provider={provider} 
-                    userAddress={userAddress}
-                    refreshTrigger={userDataRefresh}
-                    onLoadingStateChange={setNftCalculationInProgress}
-                  />
-                </div>
-                
-                <div>
-                  <RewardsPanel 
-                    userAddress={userAddress} 
-                    totalPoints={totalPoints} 
-                    onRewardClaimed={handleDataRefresh} 
-                    provider={provider}
-                  />
-                </div>
-                
-                {/* Nuevo componente de leaderboard */}
-                <div className="md:col-span-3 mt-6">
-                  <LeaderboardDisplay />
-                </div>
-              </div>
+              <EvolutionInterface 
+                provider={provider} 
+                userAddress={userAddress}
+              />
             ) : (
               <div className="flex flex-col items-center justify-center space-y-8">
                 {/* Logo de Primos */}
@@ -241,18 +169,18 @@ export default function Home() {
                   />
                 </div>
                 
-                {/* Mensaje de bienvenida (en inglés como solicitado) */}
+                {/* Mensaje de bienvenida */}
                 <h2 className="text-2xl font-bold text-white text-center">
-                  Connect your Ronin Wallet and start earning rewards
+                  Connect your Ronin Wallet to evolve your Primos
                 </h2>
                 
                 {/* Video con preview */}
                 <div className="w-full max-w-3xl mx-auto">
                   <video 
-                    src="/videos/primos_o.webm" 
+                    src="/videos/piedras_o.webm" 
                     autoPlay
                     loop
-                    controls
+                   
                     muted
                     playsInline
                     className="w-full rounded-lg"
@@ -260,9 +188,9 @@ export default function Home() {
                   />
                 </div>
                 
-                {/* Componente How Rewards Works con texto en blanco */}
-                <div className="w-full max-w-3xl mx-auto bg-gray-800 rounded-lg shadow-md p-6 text-white">
-                  <HowRewardsWorks />
+                {/* About Evolution component */}
+                <div className="w-full max-w-3xl mx-auto">
+                  <AboutEvolution />
                 </div>
               </div>
             )}
@@ -279,7 +207,7 @@ export default function Home() {
                 className="mb-2"
               />
               <p className="text-center text-sm text-gray-400">
-                PRIMOS Daily Check-in App - {new Date().getFullYear()}
+                PRIMOS Evolution - {new Date().getFullYear()}
               </p>
             </div>
           </div>

@@ -4,6 +4,20 @@
 
 /* Remove @theme inline rule that was causing errors */
 
+/* Custom animations for the Evolution interface */
+@keyframes loadingBar {
+  0% {
+    width: 0%;
+  }
+  100% {
+    width: 100%;
+  }
+}
+
+.animate-loadingBar {
+  animation: loadingBar 2s infinite ease-in-out;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;

@@ -1,6 +1,10 @@
 import { supabase, updateLeaderboard } from '@/utils/supabase';
 import { ethers } from 'ethers';
+import { Web3Provider } from '@ethersproject/providers';
 import { abi as ERC721ABI } from '@/utils/erc721-abi'; // You'll need to create this file with the ABI
+
+// Debug flag to control verbose logging
+const DEBUG_MODE = process.env.NODE_ENV === 'development';
 
 // Primos NFT contract address
 export const PRIMOS_NFT_CONTRACT = '0x23924869ff64ab205b3e3be388a373d75de74ebd';
@@ -21,7 +25,7 @@ export interface NFTMetadata {
  * Gets current NFTs from the blockchain, compares them with those in the database,
  * and removes those that are no longer in the user's wallet.
  */
-export async function fetchUserNFTs(provider: ethers.providers.Web3Provider, walletAddress: string) {
+export async function fetchUserNFTs(provider: Web3Provider, walletAddress: string) {
   try {
     console.log(`⚡ START: Fetching NFTs for wallet: ${walletAddress}`);
     
@@ -38,9 +42,11 @@ export async function fetchUserNFTs(provider: ethers.providers.Web3Provider, wal
       if (existingNfts && existingNfts.length > 0) {
         const totalBonusPoints = existingNfts.reduce((sum, nft) => sum + (nft.bonus_points || 0), 0);
         console.log(`⚠️ DB STATE DETAILS: Total bonus points before cleanup: ${totalBonusPoints}`);
-        existingNfts.forEach(nft => {
-          console.log(`   - NFT #${nft.token_id}: ${nft.rarity || 'unknown'} (${nft.bonus_points || 0} points)`);
-        });
+        if (DEBUG_MODE) {
+          existingNfts.forEach(nft => {
+            console.log(`   - NFT #${nft.token_id}: ${nft.rarity || 'unknown'} (${nft.bonus_points || 0} points)`);
+          });
+        }
       }
     }
     
@@ -139,41 +145,47 @@ export async function fetchUserNFTs(provider: ethers.providers.Web3Provider, wal
       let isZ = false;
       let isFullSet = false;
       
-      console.log(`Processing metadata for NFT #${tokenIdNum}:`, metadata);
+      if (DEBUG_MODE) {
+        console.log(`Processing metadata for NFT #${tokenIdNum}:`, metadata);
+      }
       
       if (metadata?.attributes) {
-        console.log(`Attributes for NFT #${tokenIdNum}:`, metadata.attributes);
+        if (DEBUG_MODE) {
+          console.log(`Attributes for NFT #${tokenIdNum}:`, metadata.attributes);
+        }
         
         // Determine rarity
         const rarityAttr = metadata.attributes.find(attr => attr.trait_type === 'Rarity');
         if (rarityAttr) {
           rarity = rarityAttr.value as string;
-          console.log(`Found rarity for NFT #${tokenIdNum}: "${rarity}"`);
+          if (DEBUG_MODE) {
+            console.log(`Found rarity for NFT #${tokenIdNum}: "${rarity}"`);
+          }
           
           // Calculate bonus points based on rarity
           if (rarity === 'unique') {
             bonusPoints += 30;
-            console.log(`  → +30 points for unique rarity`);
+            if (DEBUG_MODE) console.log(`  → +30 points for unique rarity`);
           }
           else if (rarity === 'shiny Z') {
             bonusPoints += 13;
             isShiny = true;
             isZ = true;
-            console.log(`  → +13 points for shiny Z rarity`);
+            if (DEBUG_MODE) console.log(`  → +13 points for shiny Z rarity`);
           }
           else if (rarity === 'shiny') {
             bonusPoints += 7;
             isShiny = true;
-            console.log(`  → +7 points for shiny rarity`);
+            if (DEBUG_MODE) console.log(`  → +7 points for shiny rarity`);
           }
           else if (rarity === 'original Z') {
             bonusPoints += 4;
             isZ = true;
-            console.log(`  → +4 points for original Z rarity`);
+            if (DEBUG_MODE) console.log(`  → +4 points for original Z rarity`);
           }
           else if (rarity === 'original') {
             bonusPoints += 1;
-            console.log(`  → +1 point for original rarity`);
+            if (DEBUG_MODE) console.log(`  → +1 point for original rarity`);
           }
         } else {
           console.log(`⚠️ No rarity attribute found for NFT #${tokenIdNum}`);
@@ -184,13 +196,15 @@ export async function fetchUserNFTs(provider: ethers.providers.Web3Provider, wal
         if (fullSetAttr && fullSetAttr.value === true) {
           bonusPoints += 2;
           isFullSet = true;
-          console.log(`  → +2 points for Full Set attribute`);
+          if (DEBUG_MODE) console.log(`  → +2 points for Full Set attribute`);
         }
       } else {
         console.log(`⚠️ No attributes found in metadata for NFT #${tokenIdNum}`);
       }
       
-      console.log(`Final calculation for NFT #${tokenIdNum}: ${bonusPoints} bonus points (rarity: ${rarity}, shiny: ${isShiny}, Z: ${isZ}, fullSet: ${isFullSet})`);
+      if (DEBUG_MODE) {
+        console.log(`Final calculation for NFT #${tokenIdNum}: ${bonusPoints} bonus points (rarity: ${rarity}, shiny: ${isShiny}, Z: ${isZ}, fullSet: ${isFullSet})`);
+      }
       
       // Save or update the NFT in the database
       const { data, error } = await supabase
@@ -244,8 +258,13 @@ export async function fetchUserNFTs(provider: ethers.providers.Web3Provider, wal
   }
 }
 
+// Variable global para evitar mostrar el mensaje de advertencia múltiples veces
+let warnMessageShown = false;
+
 export async function calculateNFTPoints(walletAddress: string) {
   try {
+    console.log(`Calculando NFTs elegibles para wallet ${walletAddress}`);
+    
     // Get all of the user's NFTs
     const { data: nfts, error } = await supabase
       .from('nfts')
@@ -254,30 +273,168 @@ export async function calculateNFTPoints(walletAddress: string) {
     
     if (error) throw error;
     
-    // Get NFTs already used today by ANY wallet
-    const today = new Date().toISOString().split('T')[0]; // Format YYYY-MM-DD
+    // Get NFTs already used today by ANY wallet - use UTC date for consistency
+    const utcDate = new Date();
+    const today = new Date(Date.UTC(
+      utcDate.getUTCFullYear(),
+      utcDate.getUTCMonth(),
+      utcDate.getUTCDate()
+    )).toISOString().split('T')[0]; // Format YYYY-MM-DD in UTC
+    
+    console.log(`Verificando NFTs para fecha UTC ${today}`);
+    
+    // Verificar si hay check-ins hechos hoy por este wallet
+    const { data: checkInsToday, error: checkInError } = await supabase
+      .from('check_ins')
+      .select('id, created_at')
+      .eq('wallet_address', walletAddress.toLowerCase())
+      .gte('created_at', `${today}T00:00:00Z`)
+      .lte('created_at', `${today}T23:59:59Z`);
+    
+    let alreadyCheckedInToday = false;
+    
+    if (checkInError) {
+      console.error('Error al verificar check-ins de hoy:', checkInError);
+    } else {
+      // Si ya hay un check-in hoy, verificar si hay NFTs registrados para ese check-in
+      if (checkInsToday && checkInsToday.length > 0) {
+        alreadyCheckedInToday = true;
+        
+        const checkInIds = checkInsToday.map(checkIn => checkIn.id);
+        
+        // Verificar si hay NFTs registrados para esos check-ins
+        const { data: checkInNfts, error: checkInNftsError } = await supabase
+          .from('nft_usage_tracking')
+          .select('token_id, contract_address, check_in_id')
+          .in('check_in_id', checkInIds);
+        
+        if (checkInNftsError) {
+          console.error('Error al verificar NFTs usados en check-ins de hoy:', checkInNftsError);
+        } else {
+          // Si no hay NFTs registrados para los check-ins de hoy, es posible que hayan fallado
+          // en registrarse. Marcar todos los NFTs como no elegibles.
+          if (checkInNfts && checkInNfts.length === 0 && nfts && nfts.length > 0) {
+            if (!warnMessageShown) {
+              console.warn('Se encontraron check-ins de hoy pero sin NFTs registrados. Todos los NFTs serán marcados como no elegibles.');
+              warnMessageShown = true;
+            }
+            return { success: true, totalPoints: 0, eligibleNfts: [] };
+          }
+        }
+      }
+    }
+    
+    // Fecha formateada explícitamente para máxima compatibilidad
+    const todayFormatted = today;
+    if (DEBUG_MODE) {
+      console.log("VERIFICANDO CON FECHA EXACTA:", todayFormatted);
+      console.log(`VALOR EXACTO DE todayFormatted: "${todayFormatted}" (${typeof todayFormatted})`);
+    }
+    
+    // Consulta directa sin filtrado para ver registros recientes
+    const { data: allRecords, error: allRecordsError } = await supabase
+      .from('nft_usage_tracking')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(10);
+      
+    if (DEBUG_MODE) {
+      console.log("REGISTROS RECIENTES (muestra):", allRecords?.length || 0);
+    }
+    
+    if (allRecordsError) {
+      console.error('Error al consultar registros recientes:', allRecordsError);
+    }
+    
+    // Obtener NFTs usados hoy con fecha explícita
     const { data: usedNfts, error: usedError } = await supabase
       .from('nft_usage_tracking')
-      .select('token_id, contract_address')
-      .eq('usage_date', today);
-    // Note: We no longer filter by wallet_address
+      .select('*')
+      .eq('usage_date', todayFormatted);
     
-    if (usedError) throw usedError;
+    if (usedError) {
+      console.error('Error al verificar NFTs usados:', usedError);
+      throw usedError;
+    }
     
-    // Create a set of used NFTs for quick lookup
-    const usedNftSet = new Set();
-    usedNfts?.forEach(nft => {
-      const key = `${nft.token_id}-${nft.contract_address}`;
-      usedNftSet.add(key);
-    });
+    if (DEBUG_MODE) {
+      console.log(`NFTs usados hoy (${todayFormatted}):`, usedNfts?.length || 0);
+    }
     
-    // Filter unused NFTs and sum their points
-    const eligibleNfts = nfts?.filter(nft => {
-      const key = `${nft.token_id}-${nft.contract_address}`;
-      return !usedNftSet.has(key);
+    // Verificación adicional con formato alternativo
+    const utcDateString = new Date().toISOString().split('T')[0];
+    const { data: usedNftsAlt, error: usedErrorAlt } = await supabase
+      .from('nft_usage_tracking')
+      .select('*')
+      .eq('usage_date', utcDateString);
+      
+    if (DEBUG_MODE && usedNftsAlt && usedNftsAlt.length > 0) {
+      console.log(`NFTs usados con formato alternativo (${utcDateString}):`, usedNftsAlt.length);
+    }
+    
+    // Verificación manual para mayor consistencia
+    const blockedNfts = allRecords?.filter(record => {
+      // Comparar la fecha con todas las variantes posibles
+      const recordDate = record.usage_date;
+      const matchesToday = (
+        recordDate === todayFormatted || 
+        recordDate === utcDateString ||
+        recordDate.startsWith(todayFormatted) ||
+        recordDate.startsWith(utcDateString)
+      );
+      
+      return matchesToday;
     }) || [];
     
+    // Crear un conjunto de token_ids usados (convertidos a STRING para consistencia)
+    const usedTokenIdSet = new Set();
+    
+    // Añadir NFTs bloqueados a un conjunto para eliminar duplicados
+    [...(usedNfts || []), ...(usedNftsAlt || []), ...blockedNfts].forEach(nft => {
+      if (nft) {
+        // Convertir siempre a string para eliminar problemas de tipo
+        const tokenIdAsString = String(nft.token_id);
+        usedTokenIdSet.add(tokenIdAsString);
+        // Eliminamos este log que causa miles de mensajes
+        // console.log(`NFT BLOQUEADO: #${tokenIdAsString}`);
+      }
+    });
+    
+    // Se eliminó el código de tratamiento especial para NFT #216
+    
+    console.log(`NFTs bloqueados: ${usedTokenIdSet.size} encontrados`);
+    
+    // Si el usuario ya ha hecho check-in hoy, todos sus NFTs se consideran usados
+    if (alreadyCheckedInToday && nfts) {
+      console.log(`El usuario ya hizo check-in hoy. Sus ${nfts.length} NFTs se consideran usados.`);
+      return { success: true, totalPoints: 0, eligibleNfts: [] };
+    }
+    
+    // Filtro simple con conversión de tipos consistente
+    const eligibleNfts = nfts?.filter(nft => {
+      // Siempre convertir a string para comparación consistente
+      const tokenIdAsString = String(nft.token_id);
+      
+      // Un NFT está bloqueado si su ID (como string) está en el conjunto
+      const isBlocked = usedTokenIdSet.has(tokenIdAsString);
+      
+      // Solo mostramos estos logs para los NFTs del usuario, no para todos
+      if (DEBUG_MODE) {
+        if (isBlocked) {
+          console.log(`🚫 NFT #${nft.token_id} - No disponible hoy`);
+        } else {
+          console.log(`✅ NFT #${nft.token_id} - Disponible para usar hoy`);
+        }
+      }
+      
+      // Solo es elegible si NO está bloqueado
+      return !isBlocked;
+    }) || [];
+    
+    console.log(`NFTs elegibles para check-in: ${eligibleNfts.length} de ${nfts?.length || 0} total`);
+    
     const totalPoints = eligibleNfts.reduce((sum, nft) => sum + (nft.bonus_points || 0), 0);
+    console.log(`Puntos totales de NFTs elegibles: ${totalPoints}`);
     
     return { 
       success: true, 

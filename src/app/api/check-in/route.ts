@@ -150,31 +150,120 @@ export async function POST(req: NextRequest) {
     
     // Registrar los NFTs usados en este check-in
     if (eligibleNfts && eligibleNfts.length > 0) {
-      try {
-        const nftUsageRecords = eligibleNfts.map(nft => ({
-          token_id: nft.token_id,
-          contract_address: nft.contract_address,
-          wallet_address: wallet_address.toLowerCase(),
-          check_in_id: checkIn.id,
-          // usage_date se establece automáticamente como la fecha actual por el valor predeterminado
-        }));
-
-        const { error: usageError } = await supabase
-          .from('nft_usage_tracking')
-          .insert(nftUsageRecords);
-
-        if (usageError) {
-          // Si el error es por restricción única, significa que algún NFT ya fue usado hoy
-          if (usageError.code === '23505') { // Código de error de PostgreSQL para violación de restricción única
-            console.log('Algunos NFTs ya fueron usados hoy por otra wallet');
+      console.log(`Intentando registrar ${eligibleNfts.length} NFTs para el check-in ${checkIn.id}`);
+      
+      // Array para almacenar NFTs que no se pudieron registrar
+      const failedNfts = [];
+      const successNfts = [];
+      
+      // Obtener la fecha UTC actual para asegurar consistencia
+      const utcDate = new Date();
+      const today = new Date(Date.UTC(
+        utcDate.getUTCFullYear(),
+        utcDate.getUTCMonth(),
+        utcDate.getUTCDate()
+      ));
+      
+      // Insertar NFTs uno por uno para mayor robustez
+      for (const nft of eligibleNfts) {
+        try {
+          // Convertir el token_id a string para garantizar consistencia en todas partes
+          const tokenIdAsString = String(nft.token_id);
+          
+          // Preparamos el registro para rastrear el uso del NFT en este check-in
+          const nftRecord = {
+            token_id: nft.token_id, // Mantenemos el tipo original para compatibilidad
+            contract_address: nft.contract_address.toLowerCase(), // Asegurar lowercase
+            check_in_id: checkIn.id,
+            usage_date: today.toISOString().split('T')[0], // Formatear como YYYY-MM-DD (fecha UTC)
+            wallet_address: wallet_address.toLowerCase() // Registrar la wallet que lo usó
+          };
+          
+          console.log(`Registrando NFT #${tokenIdAsString} para bloquearlo globalmente`);
+          
+          // VERIFICACIÓN SIMPLE: Verificar si el NFT ya está usado hoy globalmente
+          const { data: usedNfts, error: checkError } = await supabase
+            .from('nft_usage_tracking')
+            .select('*')
+            .eq('usage_date', today.toISOString().split('T')[0]);
+            
+          if (checkError) {
+            console.error(`Error verificando uso existente de NFT #${tokenIdAsString}:`, checkError);
           } else {
-            console.error('Error registering NFT usage:', usageError);
+            // Verificar si el NFT ya está bloqueado con una comparación de string
+            const isAlreadyUsed = usedNfts?.some(usedNft => String(usedNft.token_id) === tokenIdAsString);
+            
+            if (isAlreadyUsed) {
+              console.log(`NFT #${tokenIdAsString} ya está bloqueado globalmente`);
+              failedNfts.push({ ...nft, reason: 'already_used' });
+              continue;
+            }
           }
+          
+          // Si no existe, intentar insertar el registro
+          const { error: usageError } = await supabase
+            .from('nft_usage_tracking')
+            .insert([nftRecord]);
+          
+          if (usageError) {
+            // Si el error es por restricción única, significa que el NFT ya fue usado hoy
+            if (usageError.code === '23505') {
+              console.log(`NFT #${nft.token_id} ya fue usado hoy (detectado por error de restricción única)`);
+              failedNfts.push({ ...nft, reason: 'already_used' });
+            } else {
+              console.error(`Error registrando uso de NFT #${nft.token_id}:`, usageError);
+              
+              // Intentar una vez más con un pequeño retraso
+              await new Promise(resolve => setTimeout(resolve, 500));
+              
+              const { error: retryError } = await supabase
+                .from('nft_usage_tracking')
+                .insert([nftRecord]);
+                
+              if (retryError) {
+                console.error(`Error en segundo intento de registro de NFT #${nft.token_id}:`, retryError);
+                failedNfts.push({ ...nft, reason: 'error', error: retryError });
+              } else {
+                console.log(`NFT #${nft.token_id} registrado correctamente en segundo intento`);
+                successNfts.push(nft);
+              }
+            }
+          } else {
+            console.log(`NFT #${nft.token_id} registrado correctamente para check-in ${checkIn.id}`);
+            successNfts.push(nft);
+          }
+        } catch (error) {
+          console.error(`Error inesperado registrando NFT #${nft.token_id}:`, error);
+          failedNfts.push({ ...nft, reason: 'unexpected_error', error });
         }
-      } catch (error) {
-        console.error('Error registering NFT usage:', error);
-        // No fallamos el check-in si esto falla, solo registramos el error
       }
+      
+      // Registrar NFTs que no se pudieron bloquear
+      if (failedNfts.length > 0) {
+        console.warn(`No se pudieron registrar ${failedNfts.length} NFTs para el check-in ${checkIn.id}`);
+        console.warn('NFTs fallidos:', JSON.stringify(failedNfts));
+      }
+      
+      // Registrar éxito
+      console.log(`Se registraron correctamente ${successNfts.length} de ${eligibleNfts.length} NFTs para el check-in ${checkIn.id}`);
+      
+      // Verificar si se registraron correctamente - doble verificación
+      const { data: verifyNfts, error: verifyError } = await supabase
+        .from('nft_usage_tracking')
+        .select('token_id, contract_address')
+        .eq('check_in_id', checkIn.id);
+        
+      if (verifyError) {
+        console.error('Error verificando NFTs registrados:', verifyError);
+      } else {
+        console.log(`Verificación: ${verifyNfts?.length || 0} NFTs registrados para check-in ${checkIn.id}`);
+        
+        if (verifyNfts && verifyNfts.length !== successNfts.length) {
+          console.error(`¡ADVERTENCIA! El número de NFTs verificados (${verifyNfts.length}) no coincide con los reportados como exitosos (${successNfts.length})`);
+        }
+      }
+    } else {
+      console.log(`No hay NFTs elegibles para registrar en este check-in ${checkIn.id}`);
     }
     
     // Actualizar total_points
