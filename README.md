@@ -83,3 +83,6 @@ Ronin Saigon is the testnet for the Ronin blockchain. To use it:
 - Make sure your Ronin wallet is connected to the Saigon testnet
 - Ensure you have sufficient testnet RON for gas fees
 - Check the console for any errors during contract interactions
+
+## Last Updated
+- Last sync: March 28, 2025 - Updated for Vercel deployment
