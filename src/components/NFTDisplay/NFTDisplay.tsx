@@ -11,9 +11,16 @@ interface NFTDisplayProps {
   userAddress: string | null;
   refreshTrigger?: number; // New prop to trigger updates
   onLoadingStateChange?: (isLoading: boolean) => void; // Add new prop for callback
+  onEligiblePointsChange?: (points: number) => void; // Add new prop for eligible points callback
 }
 
-const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshTrigger, onLoadingStateChange }) => {
+const NFTDisplay: React.FC<NFTDisplayProps> = ({ 
+  provider, 
+  userAddress, 
+  refreshTrigger, 
+  onLoadingStateChange,
+  onEligiblePointsChange
+}) => {
   const [nfts, setNfts] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [syncingNFTs, setSyncingNFTs] = useState<boolean>(false);
@@ -123,6 +130,11 @@ const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshT
         const { totalPoints: eligibleNftPoints, eligibleNfts, success: nftPointsSuccess } = await calculateNFTPoints(userAddress);
         setEligiblePoints(eligibleNftPoints);
         
+        // Notify parent component about eligible points
+        if (onEligiblePointsChange) {
+          onEligiblePointsChange(eligibleNftPoints);
+        }
+        
         // Now calculate total points from all NFTs regardless of usage
         const { data: allNfts, error: allNftsError } = await supabase
           .from('nfts')
@@ -177,7 +189,7 @@ const NFTDisplay: React.FC<NFTDisplayProps> = ({ provider, userAddress, refreshT
     };
     
     loadData();
-  }, [provider, userAddress, refreshTrigger, onLoadingStateChange]);
+  }, [provider, userAddress, refreshTrigger, onLoadingStateChange, onEligiblePointsChange]);
   
   // Handle responsive sizing for carousel - maximum 4 on desktop as requested
   useEffect(() => {

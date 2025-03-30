@@ -13,6 +13,7 @@ const FIRE_DUST_ID = 4; // ID correcto según metadatos del token Fire Dust
 interface RewardsPanelProps {
   userAddress: string | null;
   totalPoints: number;
+  eligiblePoints?: number; // Add new prop for eligible points from NFTs
   onRewardClaimed: () => void;
   provider: ethers.providers.Web3Provider | null;
 }
@@ -20,6 +21,7 @@ interface RewardsPanelProps {
 const RewardsPanel: React.FC<RewardsPanelProps> = ({ 
   userAddress, 
   totalPoints,
+  eligiblePoints = 0, // Default to 0 if not provided
   onRewardClaimed,
   provider
 }) => {
@@ -115,9 +117,12 @@ const RewardsPanel: React.FC<RewardsPanelProps> = ({
     throw lastError || new Error('All fetch attempts failed');
   };
   
+  // Calculate total claimable points (stored points + eligible NFT points)
+  const totalClaimablePoints = totalPoints + eligiblePoints;
+  
   // Manejar la solicitud de recompensa
   const handleClaimRewards = async () => {
-    if (!userAddress || totalPoints <= 0) {
+    if (!userAddress || totalClaimablePoints <= 0) {
       setError('No points available to claim');
       return;
     }
@@ -222,7 +227,7 @@ const RewardsPanel: React.FC<RewardsPanelProps> = ({
         },
         body: JSON.stringify({
           walletAddress: userAddress,
-          amount: totalPoints,
+          amount: totalClaimablePoints,
         }),
       });
       
@@ -250,11 +255,11 @@ const RewardsPanel: React.FC<RewardsPanelProps> = ({
       // elimino la actualización duplicada desde aquí para evitar contar doble los tokens
       
       // Actualizar el balance local de tokens
-      const newTokenBalance = (parseInt(tokenBalance) + totalPoints).toString();
+      const newTokenBalance = (parseInt(tokenBalance) + totalClaimablePoints).toString();
       setTokenBalance(newTokenBalance);
       
       // Mostrar mensaje de éxito
-      setSuccess(`Successfully claimed ${totalPoints} Fire Dust tokens!`);
+      setSuccess(`Successfully claimed ${totalClaimablePoints} Fire Dust tokens!`);
       
       // Actualizar la UI del componente padre
       onRewardClaimed();
@@ -302,7 +307,7 @@ const RewardsPanel: React.FC<RewardsPanelProps> = ({
       
       <div className="">
         <div className="bg-gray-700 p-4 rounded-md">
-        {totalPoints <= 0 ? (
+        {totalClaimablePoints <= 0 ? (
           <div className="mt-4">
             <img 
               src="/images/firedust-byn.png" 
@@ -322,7 +327,12 @@ const RewardsPanel: React.FC<RewardsPanelProps> = ({
             />
           </div>
         )}
-          <p className="text-2xl font-bold"> Total: {totalPoints === 0 ? '0' : totalPoints.toFixed(2)}</p>
+          <p className="text-2xl font-bold"> Total: {totalClaimablePoints === 0 ? '0' : totalClaimablePoints.toFixed(2)}</p>
+          {eligiblePoints > 0 && (
+            <p className="text-sm text-green-400 mt-1">
+              Includes {eligiblePoints} points from available NFTs
+            </p>
+          )}
           
         </div>
         
@@ -337,9 +347,9 @@ const RewardsPanel: React.FC<RewardsPanelProps> = ({
         </div>
         <button
           onClick={handleClaimRewards}
-          disabled={loading || totalPoints <= 0 || !userAddress}
+          disabled={loading || totalClaimablePoints <= 0 || !userAddress}
           className={`w-full px-6 py-3 rounded-md font-medium ${
-            loading || totalPoints <= 0 || !userAddress
+            loading || totalClaimablePoints <= 0 || !userAddress
               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
               : 'bg-blue-600 text-white hover:bg-blue-700'
           }`}
