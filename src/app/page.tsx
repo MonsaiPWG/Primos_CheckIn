@@ -240,6 +240,7 @@ export default function Home() {
                     totalPoints={totalPoints}
                     eligiblePoints={eligiblePoints}
                     onRewardClaimed={handleDataRefresh} 
+                    onEligiblePointsChange={handleEligiblePointsChange}
                     provider={provider}
                   />
                 </div>

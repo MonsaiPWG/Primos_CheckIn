@@ -15,6 +15,7 @@ interface RewardsPanelProps {
   totalPoints: number;
   eligiblePoints?: number; // Add new prop for eligible points from NFTs
   onRewardClaimed: () => void;
+  onEligiblePointsChange?: (points: number) => void; // Add new prop for callback
   provider: ethers.providers.Web3Provider | null;
 }
 
@@ -23,6 +24,7 @@ const RewardsPanel: React.FC<RewardsPanelProps> = ({
   totalPoints,
   eligiblePoints = 0, // Default to 0 if not provided
   onRewardClaimed,
+  onEligiblePointsChange,
   provider
 }) => {
   // Estado local
@@ -260,6 +262,11 @@ const RewardsPanel: React.FC<RewardsPanelProps> = ({
       
       // Mostrar mensaje de éxito
       setSuccess(`Successfully claimed ${totalClaimablePoints} Fire Dust tokens!`);
+      
+      // Reset eligible points to 0 after successful claim
+      if (onEligiblePointsChange) {
+        onEligiblePointsChange(0);
+      }
       
       // Actualizar la UI del componente padre
       onRewardClaimed();
