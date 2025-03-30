@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server';
 import { createDirectWallet, getBlockNumberDirect, callRpcDirectly } from '@/utils/direct-rpc';
 import { logDetailedError } from '@/utils/retry-utils';
 import { updateLeaderboard } from '@/utils/supabase';
+import { calculateNFTPoints } from '@/services/nftService';
 
 // Configuración
 const TOKEN_CONTRACT_ADDRESS = '0xE3a334D6b7681D0151b81964CAf6353905e24B1b'; // Fire Dust
@@ -118,14 +119,28 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!userData || userData.total_points < Number(amount)) {
+    // Calcular puntos elegibles de NFTs
+    console.log('Calculando puntos elegibles de NFTs...');
+    const { totalPoints: eligibleNftPoints, eligibleNfts, success: nftPointsSuccess } = 
+      await calculateNFTPoints(walletAddress);
+    
+    if (!nftPointsSuccess) {
+      console.error('Error al calcular puntos de NFTs');
+    }
+    
+    // Sumar puntos de la base de datos y puntos elegibles de NFTs
+    const totalAvailablePoints = (userData?.total_points || 0) + eligibleNftPoints;
+    console.log('Puntos totales disponibles:', totalAvailablePoints, 
+      `(${userData?.total_points || 0} en DB + ${eligibleNftPoints} de NFTs elegibles)`);
+
+    if (!userData || totalAvailablePoints < Number(amount)) {
       return NextResponse.json(
         { error: 'Puntos insuficientes' },
         { status: 400 }
       );
     }
     
-    console.log('Puntos del usuario verificados:', userData.total_points);
+    console.log('Puntos del usuario verificados:', totalAvailablePoints);
 
     // Verificar que la clave privada del distribuidor esté configurada
     if (!DISTRIBUTOR_PRIVATE_KEY) {
@@ -388,8 +403,14 @@ export async function POST(request: Request) {
         console.error('Error al registrar recompensa en la base de datos:', rewardError);
       }
       
-      // Actualizar puntos del usuario
-      const newTotalPoints = userData.total_points - Number(amount);
+      // Determinar cuántos puntos se toman de la base de datos y cuántos de NFTs
+      let pointsFromDb = Math.min(userData.total_points, Number(amount));
+      let pointsFromNfts = Math.max(0, Number(amount) - pointsFromDb);
+      
+      console.log(`Distribución de puntos: ${pointsFromDb} de DB, ${pointsFromNfts} de NFTs`);
+      
+      // Actualizar puntos del usuario en la base de datos
+      const newTotalPoints = Math.max(0, userData.total_points - pointsFromDb);
       const { error: updateError } = await supabase
         .from('users')
         .update({ total_points: newTotalPoints })
@@ -397,6 +418,67 @@ export async function POST(request: Request) {
       
       if (updateError) {
         console.error('Error al actualizar puntos del usuario:', updateError);
+      }
+      
+      // Si se usaron puntos de NFTs, marcarlos como usados
+      if (pointsFromNfts > 0 && eligibleNfts && eligibleNfts.length > 0) {
+        console.log(`Marcando NFTs como usados para ${pointsFromNfts} puntos...`);
+        
+        // Crear un registro de check-in para este claim
+        const utcDate = new Date();
+        const today = new Date(Date.UTC(
+          utcDate.getUTCFullYear(),
+          utcDate.getUTCMonth(),
+          utcDate.getUTCDate()
+        )).toISOString().split('T')[0]; // Format YYYY-MM-DD in UTC
+        
+        const { data: checkInData, error: checkInError } = await supabase
+          .from('check_ins')
+          .insert({
+            wallet_address: walletAddress.toLowerCase(),
+            points_earned: pointsFromNfts,
+            created_at: new Date().toISOString(),
+            is_from_claim: true
+          })
+          .select();
+        
+        if (checkInError) {
+          console.error('Error al crear registro de check-in para claim:', checkInError);
+        } else if (checkInData && checkInData.length > 0) {
+          const checkInId = checkInData[0].id;
+          console.log(`Registro de check-in creado con ID ${checkInId}`);
+          
+          // Marcar NFTs como usados hasta alcanzar los puntos necesarios
+          let pointsMarked = 0;
+          const nftUsageRecords = [];
+          
+          for (const nft of eligibleNfts) {
+            if (pointsMarked >= pointsFromNfts) break;
+            
+            nftUsageRecords.push({
+              token_id: nft.token_id,
+              contract_address: nft.contract_address,
+              wallet_address: walletAddress.toLowerCase(),
+              check_in_id: checkInId,
+              usage_date: today,
+              created_at: new Date().toISOString()
+            });
+            
+            pointsMarked += nft.bonus_points || 0;
+          }
+          
+          if (nftUsageRecords.length > 0) {
+            const { error: usageError } = await supabase
+              .from('nft_usage_tracking')
+              .insert(nftUsageRecords);
+            
+            if (usageError) {
+              console.error('Error al marcar NFTs como usados:', usageError);
+            } else {
+              console.log(`${nftUsageRecords.length} NFTs marcados como usados correctamente`);
+            }
+          }
+        }
       }
       
       // Obtener el total de tokens reclamados por el usuario
@@ -417,7 +499,8 @@ export async function POST(request: Request) {
         success: true,
         txHash: txHash,
         tokens_received: tokenAmount,
-        new_balance: newTotalPoints
+        new_balance: newTotalPoints,
+        points_from_nfts: pointsFromNfts
       });
       
     } catch (error: any) {
