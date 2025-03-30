@@ -44,6 +44,22 @@ const NFTDisplay: React.FC<NFTDisplayProps> = ({
   const observerRef = useRef<IntersectionObserver | null>(null);
   const imageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   
+  // Force refresh when eligiblePoints is set to 0 from outside
+  useEffect(() => {
+    if (eligiblePoints === 0) {
+      console.log("Eligible points reset to 0, refreshing NFT display");
+      
+      // Mark all NFTs as used today
+      setNfts(prevNfts => prevNfts.map(nft => ({
+        ...nft,
+        isUsedToday: true
+      })));
+      
+      // Update the UI to show all NFTs as used
+      setPointsUsedToday(true);
+    }
+  }, [eligiblePoints]);
+
   useEffect(() => {
     if (!provider || !userAddress) return;
     
