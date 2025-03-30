@@ -18,7 +18,6 @@ export default function Home() {
   const [userAddress, setUserAddress] = useState<string | null>(null);
   const { account, connector, isConnected } = useConnectorStore();
   const [totalPoints, setTotalPoints] = useState<number>(0);
-  const [eligiblePoints, setEligiblePoints] = useState<number>(0);
   const [userDataRefresh, setUserDataRefresh] = useState<number>(0);
   const [nftCalculationInProgress, setNftCalculationInProgress] = useState<boolean>(false);
 
@@ -92,12 +91,6 @@ export default function Home() {
     setNetworkName('Not Connected');
     setUserAddress(null);
     setTotalPoints(0);
-    setEligiblePoints(0);
-  }, []);
-  
-  // Callback para recibir los puntos elegibles del NFTDisplay
-  const handleEligiblePointsChange = useCallback((points: number) => {
-    setEligiblePoints(points);
   }, []);
 
   // Memoizamos la función para actualizar datos
@@ -230,7 +223,6 @@ export default function Home() {
                     userAddress={userAddress}
                     refreshTrigger={userDataRefresh}
                     onLoadingStateChange={setNftCalculationInProgress}
-                    onEligiblePointsChange={handleEligiblePointsChange}
                   />
                 </div>
                 
@@ -238,9 +230,7 @@ export default function Home() {
                   <RewardsPanel 
                     userAddress={userAddress} 
                     totalPoints={totalPoints}
-                    eligiblePoints={eligiblePoints}
                     onRewardClaimed={handleDataRefresh} 
-                    onEligiblePointsChange={handleEligiblePointsChange}
                     provider={provider}
                   />
                 </div>
