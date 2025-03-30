@@ -59,6 +59,12 @@ export async function middleware(request: NextRequest) {
   // Esto actualiza la sesión si existe un token válido
   await supabase.auth.getSession()
 
+  // Add Content Security Policy header
+  response.headers.set(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self' 'unsafe-eval' https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co https://api.roninchain.com https://*.moralis-nodes.com; img-src 'self' data: https://ipfs.io; style-src 'self' 'unsafe-inline'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self';"
+  )
+
   return response
 }
 

@@ -7,6 +7,7 @@ import RoninWallet from '@/components/wallet-connectors/ronin-wallet/RoninWallet
 import Navigation from '@/components/Navigation';
 import EvolutionInterface from '@/components/Evolution/EvolutionInterface';
 import AboutEvolution from '@/components/Evolution/AboutEvolution';
+import ComingSoonOverlay from '@/components/Evolution/ComingSoonOverlay';
 import { useConnectorStore } from '@/hooks/useConnectorStore';
 import { RONIN_CHAIN_IDS } from '@/utils/contract';
 
@@ -15,6 +16,24 @@ export default function EvolutionPage() {
   const [networkName, setNetworkName] = useState<string>('Not Connected');
   const [userAddress, setUserAddress] = useState<string | null>(null);
   const { account, connector, isConnected } = useConnectorStore();
+  
+  // Define the launch date (March 31st, 2025 at 2pm UTC)
+  const launchDate = new Date('2025-03-31T14:00:00Z');
+  const [isFeatureAvailable, setIsFeatureAvailable] = useState<boolean>(false);
+  
+  // Check if the feature is available based on current date
+  useEffect(() => {
+    const checkAvailability = () => {
+      const now = new Date();
+      setIsFeatureAvailable(now >= launchDate);
+    };
+    
+    // Check immediately and then every minute
+    checkAvailability();
+    const interval = setInterval(checkAvailability, 60000);
+    
+    return () => clearInterval(interval);
+  }, [launchDate]);
 
   // Función para obtener el nombre de la red
   const getNetworkName = (chainId: number): string => {
@@ -153,45 +172,56 @@ export default function EvolutionPage() {
 
         <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
-            {provider ? (
-              <EvolutionInterface 
-                provider={provider} 
-                userAddress={userAddress}
-              />
+            {isFeatureAvailable ? (
+              // Show the actual Evolution interface if the feature is available
+              provider ? (
+                <EvolutionInterface 
+                  provider={provider} 
+                  userAddress={userAddress}
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center space-y-8">
+                  {/* Logo de Primos */}
+                  <div className="w-64 mx-auto">
+                    <img 
+                      src="/images/logo_primos_inicio.png" 
+                      alt="Primos Logo" 
+                      className="w-full h-auto"
+                    />
+                  </div>
+                  
+                  {/* Mensaje de bienvenida */}
+                  <h2 className="text-2xl font-bold text-white text-center">
+                    Connect your Ronin Wallet to evolve your Primos
+                  </h2>
+                  
+                  {/* Video con preview */}
+                  <div className="w-full max-w-3xl mx-auto">
+                    <video 
+                      src="/videos/piedras_o.webm" 
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="w-full rounded-lg"
+                      poster="/images/frame_primo.png"
+                    />
+                  </div>
+                  
+                  {/* About Evolution component */}
+                  <div className="w-full max-w-3xl mx-auto">
+                    <AboutEvolution />
+                  </div>
+                </div>
+              )
             ) : (
-              <div className="flex flex-col items-center justify-center space-y-8">
-                {/* Logo de Primos */}
-                <div className="w-64 mx-auto">
-                  <img 
-                    src="/images/logo_primos_inicio.png" 
-                    alt="Primos Logo" 
-                    className="w-full h-auto"
-                  />
-                </div>
-                
-                {/* Mensaje de bienvenida */}
-                <h2 className="text-2xl font-bold text-white text-center">
-                  Connect your Ronin Wallet to evolve your Primos
-                </h2>
-                
-                {/* Video con preview */}
-                <div className="w-full max-w-3xl mx-auto">
-                  <video 
-                    src="/videos/piedras_o.webm" 
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    className="w-full rounded-lg"
-                    poster="/images/frame_primo.png"
-                  />
-                </div>
-                
-                {/* About Evolution component */}
-                <div className="w-full max-w-3xl mx-auto">
+              // Show the Coming Soon overlay if the feature is not yet available
+              <>
+                <ComingSoonOverlay launchDate={launchDate} />
+                <div className="mt-12">
                   <AboutEvolution />
                 </div>
-              </div>
+              </>
             )}
           </div>
         </main>

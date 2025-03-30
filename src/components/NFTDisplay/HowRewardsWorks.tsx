@@ -1,13 +1,29 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 const HowRewardsWorks: React.FC = () => {
-  // Get the current UTC time for display
-  const nowUTC = new Date();
-  const utcHours = nowUTC.getUTCHours();
-  const utcMinutes = nowUTC.getUTCMinutes();
-  const formattedUTCTime = `${utcHours.toString().padStart(2, '0')}:${utcMinutes.toString().padStart(2, '0')}`;
+  // Initialize with empty string to avoid hydration mismatch
+  const [formattedUTCTime, setFormattedUTCTime] = useState<string>('');
+
+  // Update the time only on the client side
+  useEffect(() => {
+    const updateTime = () => {
+      const nowUTC = new Date();
+      const utcHours = nowUTC.getUTCHours();
+      const utcMinutes = nowUTC.getUTCMinutes();
+      setFormattedUTCTime(`${utcHours.toString().padStart(2, '0')}:${utcMinutes.toString().padStart(2, '0')}`);
+    };
+    
+    // Update immediately
+    updateTime();
+    
+    // Update every minute
+    const interval = setInterval(updateTime, 60000);
+    
+    // Clean up interval on unmount
+    return () => clearInterval(interval);
+  }, []);
   return (
     <div className="">
       <h3 className="text-xl font-bold mb-4 uppercase">How bonuses work</h3>

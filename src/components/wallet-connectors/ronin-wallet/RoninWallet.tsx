@@ -33,6 +33,10 @@ const RoninWallet: FC<RoninWalletProps> = ({ onConnect, onDisconnect }) => {
       
       if (!isNil(result.account)) {
         setIsConnected(true);
+        setAccount(result.account); // Explicitly set the account
+        if (result.chainId) {
+          setChainId(result.chainId); // Explicitly set the chainId if available
+        }
         
         // Create ethers provider and pass to parent component if provided
         if (onConnect) {
